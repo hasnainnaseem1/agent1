@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Zap, Target, Copy, TrendingUp, Upload, BarChart3, CheckCircle, XCircle } from 'lucide-react';
+import config from '../config';
 
 function FeaturesPage() {
   const features = [
@@ -112,12 +113,12 @@ function FeaturesPage() {
             Stop analyzing data. Start getting exact, copy-paste ready improvements
             that your competitors don't want you to know about.
           </p>
-          <Link 
-            to="/signup"
+          <a 
+            href={`${config.userAppUrl}/signup`}
             className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 inline-flex items-center gap-2"
           >
             Try It Free <span className="text-2xl">→</span>
-          </Link>
+          </a>
           <p className="text-white/80 mt-4">⚡ 1 free analysis • No credit card required</p>
         </div>
       </div>
@@ -235,12 +236,12 @@ function FeaturesPage() {
           </div>
 
           <div className="text-center mt-12">
-            <Link 
-              to="/signup"
+            <a 
+              href={`${config.userAppUrl}/signup`}
               className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 inline-flex items-center gap-2"
             >
               Start Your Free Analysis <span className="text-2xl">→</span>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
@@ -254,12 +255,12 @@ function FeaturesPage() {
             instead of confusing charts and graphs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              to="/signup"
+            <a 
+              href={`${config.userAppUrl}/signup`}
               className="bg-purple-600 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-purple-700"
             >
               Get Started Free
-            </Link>
+            </a>
             <Link 
               to="/pricing"
               className="border-2 border-purple-600 text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-purple-50"

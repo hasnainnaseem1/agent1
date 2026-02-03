@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, Zap } from 'lucide-react';
+import config from '../config';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -32,18 +33,18 @@ const Navbar = () => {
             <Link to="/contact" className="text-gray-700 hover:text-purple-600 font-medium transition-colors">
               Contact
             </Link>
-            <Link 
-              to="/login" 
+            <a 
+              href={`${config.userAppUrl}/login`}
               className="text-gray-700 hover:text-purple-600 font-medium transition-colors"
             >
               Login
-            </Link>
-            <Link 
-              to="/signup" 
+            </a>
+            <a 
+              href={`${config.userAppUrl}/signup`}
               className="bg-gradient-to-r from-purple-600 to-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-600 transition-all transform hover:scale-105"
             >
               Get Started Free
-            </Link>
+            </a>
           </div>
 
           {/* Mobile menu button */}
@@ -85,20 +86,14 @@ const Navbar = () => {
             >
               Contact
             </Link>
-            <Link
-              to="/login"
-              className="block text-gray-700 hover:text-purple-600 font-medium py-2 transition-colors"
-              onClick={toggleMenu}
-            >
+            <a href={`${config.userAppUrl}/login`}
+              className="block text-gray-700 hover:text-purple-600 font-medium py-2 transition-colors">
               Login
-            </Link>
-            <Link
-              to="/signup"
-              className="block w-full text-center bg-gradient-to-r from-purple-600 to-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-600 transition-all"
-              onClick={toggleMenu}
-            >
+            </a>
+            <a href={`${config.userAppUrl}/signup`}
+              className="block w-full text-center bg-gradient-to-r from-purple-600 to-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-600 transition-all">
               Get Started Free
-            </Link>
+            </a>
           </div>
         </div>
       )}

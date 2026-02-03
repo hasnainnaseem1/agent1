@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Mail, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import config from '../config';
 
 function ContactPage() {
   const [formData, setFormData] = useState({
@@ -226,12 +227,12 @@ function ContactPage() {
           <p className="text-xl text-white/90 mb-8">
             Don't wait—get your first analysis free and see exactly what needs to change.
           </p>
-          <Link 
-            to="/signup"
+          <a 
+            href={`${config.userAppUrl}/signup`}
             className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-100 inline-block"
           >
             Start Free Analysis
-          </Link>
+          </a>
           <p className="text-white/80 mt-4">⚡ No credit card required</p>
         </div>
       </div>

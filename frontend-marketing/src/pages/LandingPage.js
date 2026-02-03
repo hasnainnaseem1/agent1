@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Zap, ArrowRight, CheckCircle, Copy, Target, Clock } from 'lucide-react';
+import config from '../config';
 
 function LandingPage() {
   return (
@@ -28,13 +29,13 @@ function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Link 
-                to="/signup"
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-bold hover:bg-purple-50 transition shadow-xl inline-flex items-center justify-center"
               >
                 Get Started Free
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </Link>
+              </a>
               
               <a 
                 href="#how-it-works"
@@ -208,13 +209,13 @@ function LandingPage() {
           </div>
 
           <div className="text-center mt-12">
-            <Link 
-              to="/signup"
+            <a 
+              href={`${config.userAppUrl}/signup`}
               className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-lg text-lg font-bold hover:shadow-xl transition inline-flex items-center"
             >
               Try It Free Now
               <ArrowRight className="w-5 h-5 ml-2" />
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -249,12 +250,12 @@ function LandingPage() {
                   All features
                 </li>
               </ul>
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-gray-100 hover:bg-gray-200 text-gray-900 py-2 rounded-lg font-semibold transition"
               >
                 Get Started
-              </Link>
+              </a>
             </div>
 
             {/* Starter */}
@@ -279,12 +280,12 @@ function LandingPage() {
                   Email support
                 </li>
               </ul>
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold transition"
               >
                 Start Free Trial
-              </Link>
+              </a>
             </div>
 
             {/* Pro */}
@@ -312,12 +313,12 @@ function LandingPage() {
                   Priority support
                 </li>
               </ul>
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-white text-purple-600 py-2 rounded-lg font-semibold hover:bg-purple-50 transition"
               >
                 Start Free Trial
-              </Link>
+              </a>
             </div>
 
             {/* Unlimited */}
@@ -362,13 +363,13 @@ function LandingPage() {
           <p className="text-xl mb-8 text-purple-100">
             Join hundreds of sellers who have optimized their listings with AI
           </p>
-          <Link 
-            to="/signup"
+          <a 
+            href={`${config.userAppUrl}/signup`}
             className="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-bold hover:bg-purple-50 transition shadow-xl inline-flex items-center"
           >
             Get Your Free Analysis
             <ArrowRight className="w-5 h-5 ml-2" />
-          </Link>
+          </a>
           <p className="text-purple-200 text-sm mt-4">
             No credit card required • Takes 30 seconds
           </p>

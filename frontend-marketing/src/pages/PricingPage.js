@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { CheckCircle, X } from 'lucide-react';
+import config from '../config';
 
 function PricingPage() {
   return (
@@ -57,12 +58,12 @@ function PricingPage() {
                 </li>
               </ul>
               
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-gray-100 hover:bg-gray-200 text-gray-900 py-3 rounded-lg font-bold transition"
               >
                 Get Started
-              </Link>
+              </a>
             </div>
 
             {/* Starter */}
@@ -97,12 +98,12 @@ function PricingPage() {
                 </li>
               </ul>
               
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold transition"
               >
                 Start Free Trial
-              </Link>
+              </a>
             </div>
 
             {/* Pro */}
@@ -143,12 +144,12 @@ function PricingPage() {
                 </li>
               </ul>
               
-              <Link 
-                to="/signup" 
+              <a 
+                href={`${config.userAppUrl}/signup`}
                 className="block text-center bg-white text-purple-600 py-3 rounded-lg font-bold hover:bg-purple-50 transition"
               >
                 Start Free Trial
-              </Link>
+              </a>
             </div>
 
             {/* Unlimited */}
