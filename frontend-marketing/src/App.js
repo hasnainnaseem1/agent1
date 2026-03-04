@@ -17,7 +17,7 @@ if (AUTH_PATHS.includes(currentPath)) {
 }
 
 // Fallback component shown only during the replace() call (essentially never visible)
-const ExternalRedirect = ({ path }) => null;
+const ExternalRedirect = () => null;
 
 function App() {
   return (
@@ -41,14 +41,14 @@ const AppContent = () => {
       <RedirectHandler />
       <Routes>
         {/* Auth pages — redirect to customer center */}
-        <Route path="/login" element={<ExternalRedirect path="/login" />} />
-        <Route path="/signup" element={<ExternalRedirect path="/signup" />} />
-        {/* Blog pages (before catch-all) */}
+        <Route path="/login" element={<ExternalRedirect />} />
+        <Route path="/signup" element={<ExternalRedirect />} />
+        {/* Blog pages */}
         <Route path="/blog" element={<BlogListPage />} />
         <Route path="/blog/:slug" element={<BlogDetailPage />} />
-        {/* Homepage */}
+        {/* Homepage — fully admin-controlled via marketing page builder */}
         <Route path="/" element={<DynamicPage isHome />} />
-        {/* All other pages by slug */}
+        {/* ALL other pages — fully admin-controlled (features, pricing, contact, about, privacy, terms, etc.) */}
         <Route path="/:slug" element={<DynamicPage />} />
       </Routes>
     </Router>
@@ -56,3 +56,4 @@ const AppContent = () => {
 };
 
 export default App;
+

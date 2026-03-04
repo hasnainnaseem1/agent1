@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, Mail, Twitter, Linkedin, Facebook, Instagram, Youtube } from 'lucide-react';
+import { Mail, Twitter, Linkedin, Facebook, Instagram, Youtube } from 'lucide-react';
 import { useSite } from '../context/SiteContext';
+import SellseraLogo from './SellseraLogo';
 import config from '../config';
 
 function Footer() {
@@ -21,115 +22,113 @@ function Footer() {
 
   if (loading) return null;
 
+  const socialIcons = [
+    { key: 'twitter',   Icon: Twitter,   url: socialLinks.twitter?.startsWith('@') ? `https://twitter.com/${socialLinks.twitter.slice(1)}` : socialLinks.twitter },
+    { key: 'facebook',  Icon: Facebook,  url: socialLinks.facebook },
+    { key: 'linkedin',  Icon: Linkedin,  url: socialLinks.linkedin },
+    { key: 'instagram', Icon: Instagram, url: socialLinks.instagram },
+    { key: 'youtube',   Icon: Youtube,   url: socialLinks.youtube },
+  ].filter(s => s.url && socialEnabled[s.key] !== false);
+
   return (
-    <footer className="bg-gray-900 text-gray-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
+    <footer className="bg-gray-950 text-gray-400">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 mb-12">
+
+          {/* Brand column */}
+          <div className="md:col-span-5">
+            <div className="mb-4">
               {site.logoUrl ? (
-                <img src={site.logoUrl} alt={brandName} className="h-8 w-auto" />
+                <span className="inline-flex items-center gap-2.5">
+                  <img src={site.logoUrl} alt={brandName} className="h-8 w-auto" />
+                  <span className="text-xl font-bold text-white">{brandName}</span>
+                </span>
               ) : (
-                <Zap className="w-8 h-8 text-purple-500" />
+                <SellseraLogo size={32} showText darkBg />
               )}
-              <span className="text-2xl font-bold text-white">
-                {brandName}
-              </span>
             </div>
-            <p className="text-gray-400 mb-4 max-w-md">
+            <p className="text-gray-500 text-sm leading-relaxed mb-6 max-w-sm">
               {site.appDescription || site.siteDescription || ''}
             </p>
-            <div className="flex space-x-4">
+            <div className="flex items-center gap-3">
               {site.contactEmail && (
-                <a href={`mailto:${site.contactEmail}`} className="text-gray-400 hover:text-purple-500 transition" aria-label="Email">
-                  <Mail className="w-5 h-5" />
+                <a href={`mailto:${site.contactEmail}`} className="w-9 h-9 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors" aria-label="Email">
+                  <Mail className="w-4 h-4 text-gray-400" />
                 </a>
               )}
-              {socialLinks.twitter && socialEnabled.twitter !== false && (
-                <a href={socialLinks.twitter.startsWith('@') ? `https://twitter.com/${socialLinks.twitter.slice(1)}` : socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label="Twitter">
-                  <Twitter className="w-5 h-5" />
+              {socialIcons.map(({ key, Icon, url }) => (
+                <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors" aria-label={key}>
+                  <Icon className="w-4 h-4 text-gray-400" />
                 </a>
-              )}
-              {socialLinks.facebook && socialEnabled.facebook !== false && (
-                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label="Facebook">
-                  <Facebook className="w-5 h-5" />
-                </a>
-              )}
-              {socialLinks.linkedin && socialEnabled.linkedin !== false && (
-                <a href={socialLinks.linkedin} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label="LinkedIn">
-                  <Linkedin className="w-5 h-5" />
-                </a>
-              )}
-              {socialLinks.instagram && socialEnabled.instagram !== false && (
-                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label="Instagram">
-                  <Instagram className="w-5 h-5" />
-                </a>
-              )}
-              {socialLinks.youtube && socialEnabled.youtube !== false && (
-                <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label="YouTube">
-                  <Youtube className="w-5 h-5" />
-                </a>
-              )}
+              ))}
               {customSocialLinks.map((link, i) => (
-                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-purple-500 transition" aria-label={link.name}>
+                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="w-9 h-9 bg-gray-800 hover:bg-gray-700 rounded-lg flex items-center justify-center transition-colors" aria-label={link.name}>
                   {link.iconUrl ? (
-                    <img src={link.iconUrl} alt={link.name} className="w-5 h-5 rounded-sm object-cover" />
+                    <img src={link.iconUrl} alt={link.name} className="w-4 h-4 rounded-sm object-cover" />
                   ) : (
-                    <span className="text-xs font-medium">{link.name?.charAt(0)?.toUpperCase()}</span>
+                    <span className="text-xs font-bold text-gray-400">{link.name?.charAt(0)?.toUpperCase()}</span>
                   )}
                 </a>
               ))}
             </div>
           </div>
 
-          {/* Product Navigation */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Product</h3>
-            <ul className="space-y-2">
+          {/* Product navigation */}
+          <div className="md:col-span-3">
+            <h4 className="text-white text-sm font-semibold uppercase tracking-wider mb-4">Product</h4>
+            <ul className="space-y-2.5">
               {productLinks.map((item) => (
                 <li key={item.slug}>
-                  <Link to={item.path} className="text-gray-400 hover:text-purple-500 transition">
-                    {item.label}
-                  </Link>
+                  <Link to={item.path} className="text-sm text-gray-500 hover:text-white transition-colors">{item.label}</Link>
                 </li>
               ))}
               {site.enableCustomerSignup && (
                 <li>
-                  <a href={`${config.customerCenterUrl}/signup`} className="text-gray-400 hover:text-purple-500 transition">
-                    Get Started
-                  </a>
+                  <a href={`${config.customerCenterUrl}/signup`} className="text-sm text-gray-500 hover:text-white transition-colors">Get Started</a>
                 </li>
               )}
             </ul>
           </div>
 
           {/* Legal */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Legal</h3>
-            <ul className="space-y-2">
+          <div className="md:col-span-2">
+            <h4 className="text-white text-sm font-semibold uppercase tracking-wider mb-4">Legal</h4>
+            <ul className="space-y-2.5">
               {legalLinks.map((item) => (
                 <li key={item.slug}>
-                  <Link to={item.path} className="text-gray-400 hover:text-purple-500 transition">
-                    {item.label}
-                  </Link>
+                  <Link to={item.path} className="text-sm text-gray-500 hover:text-white transition-colors">{item.label}</Link>
                 </li>
               ))}
-              {/* Always show contact if there's a contact email */}
               {site.contactEmail && !navigation.some(n => n.slug === 'contact') && (
                 <li>
-                  <a href={`mailto:${site.contactEmail}`} className="text-gray-400 hover:text-purple-500 transition">
-                    Contact Us
-                  </a>
+                  <a href={`mailto:${site.contactEmail}`} className="text-sm text-gray-500 hover:text-white transition-colors">Contact</a>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {/* Support */}
+          <div className="md:col-span-2">
+            <h4 className="text-white text-sm font-semibold uppercase tracking-wider mb-4">Support</h4>
+            <ul className="space-y-2.5">
+              {site.contactEmail && (
+                <li>
+                  <a href={`mailto:${site.contactEmail}`} className="text-sm text-gray-500 hover:text-white transition-colors">Email Support</a>
+                </li>
+              )}
+              {navigation.some(n => n.slug === 'blog') && (
+                <li>
+                  <Link to="/blog" className="text-sm text-gray-500 hover:text-white transition-colors">Blog</Link>
                 </li>
               )}
             </ul>
           </div>
         </div>
 
-        {/* Bottom */}
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500 text-sm">
-          <p>&copy; {year} {brandName}. All rights reserved.</p>
+        {/* Divider + bottom */}
+        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-3">
+          <p className="text-gray-600 text-xs">&copy; {year} {brandName}. All rights reserved.</p>
+          <p className="text-gray-700 text-xs">{brandName} is not affiliated with or endorsed by Etsy, Inc.</p>
         </div>
       </div>
     </footer>

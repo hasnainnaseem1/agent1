@@ -296,7 +296,7 @@ function BlogDetailPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h3 className="font-semibold text-gray-900 group-hover:text-purple-600 transition line-clamp-2 mb-2">
+                    <h3 className="font-semibold text-gray-900 group-hover:text-gray-600 transition line-clamp-2 mb-2">
                       {r.title}
                     </h3>
                     <p className="text-sm text-gray-500 line-clamp-2">{r.excerpt}</p>

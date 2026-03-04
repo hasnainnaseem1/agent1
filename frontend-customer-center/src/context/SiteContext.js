@@ -12,6 +12,21 @@ const defaultSite = {
 
 const SiteContext = createContext({ siteConfig: defaultSite, loaded: false });
 
+/** Inject favicon into <head> — mirrors the marketing-site logic */
+const injectFavicon = (url) => {
+  if (!url) return;
+  // Update every existing icon link
+  document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
+    .forEach((el) => { el.href = url; });
+  // Ensure a shortcut icon exists
+  if (!document.querySelector('link[rel="shortcut icon"]')) {
+    const link = document.createElement('link');
+    link.rel = 'shortcut icon';
+    link.href = url;
+    document.head.appendChild(link);
+  }
+};
+
 export const SiteProvider = ({ children }) => {
   const [siteConfig, setSiteConfig] = useState(defaultSite);
   const [loaded, setLoaded] = useState(false);
@@ -22,6 +37,15 @@ export const SiteProvider = ({ children }) => {
       .then((data) => {
         if (data.success && data.site) {
           setSiteConfig({ ...defaultSite, ...data.site });
+
+          // Dynamic favicon
+          if (data.site.faviconUrl) {
+            injectFavicon(data.site.faviconUrl);
+          }
+
+          // Dynamic page title
+          const name = data.site.companyName || data.site.siteName || 'Dashboard';
+          document.title = `${name} — Dashboard`;
         }
       })
       .catch(() => {

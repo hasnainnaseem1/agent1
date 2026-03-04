@@ -34,9 +34,11 @@ import AdminProfilePage from './pages/profile/ProfilePage';
 import IntegrationsPage from './pages/integrations/IntegrationsPage';
 import { PERMISSIONS } from './utils/permissions';
 import { FeatureProvider } from './contexts/FeatureContext';
+import { useBranding } from './contexts/useBranding';
 import './App.css';
 
 function App() {
+  useBranding();
   return (
     <FeatureProvider>
     <BrowserRouter>

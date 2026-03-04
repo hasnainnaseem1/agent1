@@ -1,0 +1,36 @@
+[Unit]
+Description=Sellsera Backend API — Etsy Seller Toolkit
+Documentation=https://github.com/yourusername/sellsera
+After=network.target mongod.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/apps/sellsera/backend
+Environment="NODE_ENV=production"
+Environment="PORT=3001"
+EnvironmentFile=/home/ubuntu/apps/sellsera/backend/.env
+ExecStart=/usr/bin/node --max-old-space-size=400 /home/ubuntu/apps/sellsera/backend/src/server.js
+Restart=always
+RestartSec=10s
+StandardOutput=append:/home/ubuntu/apps/sellsera/backend/logs/backend.log
+StandardError=append:/home/ubuntu/apps/sellsera/backend/logs/backend-error.log
+
+# Resource limits (important for t3.small)
+MemoryLimit=400M
+MemoryMax=450M
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/apps/sellsera/backend/logs /home/ubuntu/apps/sellsera/backend/uploads
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30s
+
+[Install]
+WantedBy=multi-user.target

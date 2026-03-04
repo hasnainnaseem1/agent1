@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Clock, Eye, ArrowRight, Tag, TrendingUp, BookOpen } from 'lucide-react';
+import { Search, Clock, Eye, Tag, TrendingUp, BookOpen } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { useSite } from '../context/SiteContext';
@@ -109,13 +109,20 @@ function BlogListPage() {
       <Navbar />
 
       {/* Hero Banner */}
-      <section className="pt-24 pb-12" style={{ background: `linear-gradient(135deg, ${primaryColor}15, ${primaryColor}05)` }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Our Blog
+      <section className="relative bg-gray-950 text-white overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-purple-600/[0.07] rounded-full blur-3xl" />
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 text-center">
+          <div className="inline-flex items-center gap-2 bg-white/[0.08] border border-white/[0.1] rounded-full px-4 py-1.5 text-sm font-medium text-gray-300 mb-6">
+            <BookOpen className="w-4 h-4" />
+            Resources & Insights
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            Blog
           </h1>
-          <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-            Insights, tutorials, and updates to help you grow your business.
+          <p className="text-lg text-gray-400 mb-8 max-w-2xl mx-auto">
+            Guides, tips, and strategies to help you grow.
           </p>
 
           {/* Search Bar */}
@@ -125,18 +132,21 @@ function BlogListPage() {
               placeholder="Search articles..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:border-transparent bg-white shadow-sm text-gray-800"
-              style={{ focusRingColor: primaryColor }}
+              className="w-full pl-12 pr-24 py-3.5 rounded-full border border-white/[0.1] focus:outline-none focus:border-white/30 bg-white/[0.06] text-white placeholder-gray-500"
             />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5" />
             <button
               type="submit"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-white px-4 py-1.5 rounded-full text-sm font-medium"
-              style={{ backgroundColor: primaryColor }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-white text-gray-900 px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors"
             >
               Search
             </button>
           </form>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0">
+          <svg viewBox="0 0 1440 60" xmlns="http://www.w3.org/2000/svg" className="w-full fill-gray-50">
+            <path d="M0,30 C360,60 1080,0 1440,30 L1440,60 L0,60 Z" />
+          </svg>
         </div>
       </section>
 
@@ -238,7 +248,7 @@ function BlogListPage() {
                           )}
                         </div>
 
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-purple-600 transition line-clamp-2">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-gray-600 transition line-clamp-2">
                           {post.title}
                         </h3>
                         <p className="text-sm text-gray-500 mb-4 line-clamp-2">
@@ -323,7 +333,7 @@ function BlogListPage() {
                         {i + 1}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 group-hover:text-purple-600 transition line-clamp-2">
+                        <h4 className="text-sm font-medium text-gray-900 group-hover:text-gray-600 transition line-clamp-2">
                           {post.title}
                         </h4>
                         <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
