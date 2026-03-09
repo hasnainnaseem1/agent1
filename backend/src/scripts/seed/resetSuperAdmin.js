@@ -111,8 +111,9 @@ function prompt(question, hidden = false) {
     if (superAdmin) {
       // ── Update existing super admin — use direct update to avoid version conflicts ──
       const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const finalName = newName || superAdmin.name;
 
-      await User.collection.updateOne(
+      const result = await User.collection.updateOne(
         { _id: superAdmin._id },
         {
           $set: {
@@ -120,41 +121,74 @@ function prompt(question, hidden = false) {
             password:        hashedPassword,
             status:          'active',
             isEmailVerified: true,
+            accountType:     'admin',
             updatedAt:       new Date(),
             ...(newName && { name: newName }),
-          }
+          },
+          $unset: { lockUntil: '', loginAttempts: '' }
         }
       );
+
+      if (result.modifiedCount === 0) {
+        console.error('❌ Update failed — no document was modified!');
+        process.exit(1);
+      }
+
+      // Verify the password works by reading it back
+      const verified = await User.collection.findOne({ _id: superAdmin._id });
+      const passwordValid = await bcrypt.compare(newPassword, verified.password);
 
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('✅ Super Admin credentials updated!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   Name     : ${superAdmin.name}`);
-      console.log(`   Email    : ${superAdmin.email}`);
+      console.log(`   Name     : ${finalName}`);
+      console.log(`   Email    : ${newEmail}`);
       console.log(`   Password : ${newPassword}`);
+      console.log(`   Status   : ${verified.status}`);
+      console.log(`   Verified : ${verified.isEmailVerified}`);
+      console.log(`   AccType  : ${verified.accountType}`);
+      console.log(`   Role     : ${verified.role}`);
+      console.log(`   Pwd check: ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      if (!passwordValid) {
+        console.error('');
+        console.error('⚠️  Password verification failed! The password you see above');
+        console.error('   may have been corrupted by the shell. Try running with quotes:');
+        console.error("   NEW_ADMIN_PASSWORD='YourPass@123' node src/scripts/seed/resetSuperAdmin.js");
+      }
     } else {
       // ── No super admin found — create one ───────────────────────────────
       console.log('⚠️  No super admin found. Creating one...');
 
-      const created = new User({
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      const result = await User.collection.insertOne({
         name:            newName || 'Super Admin',
         email:           newEmail,
-        password:        newPassword,
+        password:        hashedPassword,
         accountType:     'admin',
         role:            'super_admin',
         status:          'active',
         isEmailVerified: true,
+        loginAttempts:   0,
+        analysisCount:   0,
+        analysisLimit:   999999,
+        plan:            'unlimited',
+        createdAt:       new Date(),
+        updatedAt:       new Date(),
       });
 
-      await created.save();
+      // Verify the password works
+      const verified = await User.collection.findOne({ _id: result.insertedId });
+      const passwordValid = await bcrypt.compare(newPassword, verified.password);
 
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('✅ Super Admin created!');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   Name     : ${created.name}`);
-      console.log(`   Email    : ${created.email}`);
+      console.log(`   Name     : ${newName || 'Super Admin'}`);
+      console.log(`   Email    : ${newEmail}`);
       console.log(`   Password : ${newPassword}`);
+      console.log(`   Pwd check: ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
 
