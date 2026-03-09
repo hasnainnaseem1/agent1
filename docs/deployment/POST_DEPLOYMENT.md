@@ -49,17 +49,45 @@ Or use WinSCP / FileZilla to upload the entire project to `/home/ubuntu/apps/sel
 
 ### **Step 2: Set Up MongoDB Users**
 
+**First, ensure MongoDB is running:**
+
+```bash
+# Start MongoDB service
+sudo systemctl start mongod
+
+# Enable auto-start on boot
+sudo systemctl enable mongod
+
+# Check status (should show "active (running)")
+sudo systemctl status mongod
+
+# If you see errors, check logs:
+sudo journalctl -u mongod -n 50
+```
+
+**Now connect to MongoDB:**
+
 ```bash
 # Connect to MongoDB
 mongosh
 
-# In mongosh, create admin user
+# In mongosh, create admin user FIRST
 use admin
 db.createUser({
   user: "adminUser",
   pwd: "YOUR_STRONG_ADMIN_PASSWORD",
   roles: ["userAdminAnyDatabase", "dbAdminAnyDatabase", "readWriteAnyDatabase"]
 })
+
+# Exit and reconnect with authentication
+exit
+```
+
+**Now reconnect as admin to create app user:**
+
+```bash
+# Connect as admin user
+mongosh -u adminUser -p YOUR_STRONG_ADMIN_PASSWORD --authenticationDatabase admin
 
 # Create application database and user
 use sellsera_production
@@ -97,7 +125,7 @@ nano .env
 MONGODB_URI=mongodb://sellseraApp:YOUR_STRONG_APP_PASSWORD@127.0.0.1:27017/sellsera_production?authSource=sellsera_production
 
 # Generate JWT secrets (run this on server):
-# node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#"
 JWT_SECRET=<paste-64-char-hex-here>
 JWT_REFRESH_SECRET=<paste-64-char-hex-here>
 SESSION_SECRET=<paste-64-char-hex-here>
@@ -129,22 +157,31 @@ npm install --production
 
 ### **Step 5: Build All Frontends**
 
+**IMPORTANT:** t3.small has only 2GB RAM. Use `NODE_OPTIONS` to limit heap and build **one at a time**:
+
 ```bash
 # Marketing frontend
 cd /home/ubuntu/apps/sellsera/frontend-marketing
 npm install
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # Customer Center
 cd /home/ubuntu/apps/sellsera/frontend-customer-center
 npm install
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 # Admin Center
 cd /home/ubuntu/apps/sellsera/frontend-admin-center
 npm install
-npm run build
+NODE_OPTIONS="--max-old-space-size=1024" npm run build
 ```
+
+> **If build still fails with "heap out of memory":** Stop nginx temporarily to free RAM:
+> ```bash
+> sudo systemctl stop nginx
+> NODE_OPTIONS="--max-old-space-size=1024" npm run build
+> sudo systemctl start nginx
+> ```
 
 **Wait for builds to complete (5-10 minutes total)**
 
@@ -272,6 +309,9 @@ nslookup api.sellsera.com
 ### **Step 8: Start Backend Service**
 
 ```bash
+# Create logs directory first (required by systemd service)
+mkdir -p /home/ubuntu/apps/sellsera/backend/logs
+
 # Install systemd service
 sudo cp /home/ubuntu/apps/sellsera/backend/sellsera-backend.service /etc/systemd/system/
 
@@ -299,10 +339,10 @@ sudo journalctl -u sellsera-backend -f
 
 ```bash
 # Test backend API
-curl http://localhost:3001/health
+curl http://localhost:3001/api/health
 
 # Test from domain (after DNS propagates)
-curl http://api.sellsera.com/health
+curl http://api.sellsera.com/api/health
 
 # Test frontends (should return HTML)
 curl http://sellsera.com
@@ -335,14 +375,14 @@ sudo certbot --nginx \
 
 **Test HTTPS:**
 ```bash
-curl https://api.sellsera.com/health
+curl https://api.sellsera.com/api/health
 ```
 
 **Open in browser:**
 - https://sellsera.com ✓ Green padlock
 - https://seller.sellsera.com ✓ Secure
 - https://me.sellsera.com ✓ Secure
-- https://api.sellsera.com/health ✓ Returns JSON
+- https://api.sellsera.com/api/health ✓ Returns JSON
 
 ---
 
@@ -373,7 +413,7 @@ mongorestore \
 
 After completing all steps, verify:
 
-- [ ] **Backend API:** `curl https://api.sellsera.com/health` returns `{"status":"ok"}`
+- [ ] **Backend API:** `curl https://api.sellsera.com/api/health` returns `{"success":true}`
 - [ ] **Marketing site:** https://sellsera.com loads your landing page
 - [ ] **Customer portal:** https://seller.sellsera.com shows login page
 - [ ] **Admin dashboard:** https://me.sellsera.com shows admin login
@@ -439,6 +479,55 @@ sudo systemctl restart sellsera-backend
 
 ## 🆘 Quick Troubleshooting
 
+### **MongoDB Connection Refused (ECONNREFUSED 127.0.0.1:27017)**
+
+**Error:** `MongoNetworkError: connect ECONNREFUSED 127.0.0.1:27017` when running `mongosh`
+
+**Cause:** MongoDB service is not running
+
+**Fix:**
+```bash
+# Check MongoDB status first
+sudo systemctl status mongod
+
+# If you see "failed" status with error: "Unrecognized option: storage.journal.enabled"
+# This means the config file has deprecated options. Fix it:
+
+sudo nano /etc/mongod.conf
+
+# Find and REMOVE or COMMENT OUT these lines:
+#   storage.journal.enabled: true
+# (MongoDB 7.0+ has journaling always enabled, this option was removed)
+
+# Save and exit (Ctrl+X, Y, Enter)
+
+# Now start MongoDB
+sudo systemctl start mongod
+
+# Enable auto-start on boot
+sudo systemctl enable mongod
+
+# Verify it's running (should show "active (running)" in green)
+sudo systemctl status mongod
+
+# If still failing, check logs for errors:
+sudo journalctl -u mongod -n 50
+
+# Common issues in logs:
+# - Permission errors: sudo chown -R mongodb:mongodb /var/lib/mongodb
+# - Lock file exists: sudo rm /var/lib/mongodb/mongod.lock && sudo systemctl start mongod
+```
+
+**Verify MongoDB is accessible:**
+```bash
+# Try connecting again
+mongosh
+
+# Should see: "Connecting to: mongodb://127.0.0.1:27017/"
+```
+
+---
+
 ### **Backend Not Starting**
 ```bash
 # Check logs for error
@@ -471,7 +560,7 @@ sudo systemctl status sellsera-backend
 sudo systemctl start sellsera-backend
 
 # Check if accessing correct port
-curl http://localhost:3001/health
+curl http://localhost:3001/api/health
 ```
 
 ### **SSL Certificate Issues**
@@ -500,7 +589,7 @@ sudo certbot renew --force-renewal
 Your deployment is complete when:
 
 1. ✅ All 4 domains load with HTTPS and green padlock
-2. ✅ Backend API returns `{"status":"ok"}` at `/health` endpoint
+2. ✅ Backend API returns `{"success":true}` at `/api/health` endpoint
 3. ✅ Backend service shows `active (running)` status
 4. ✅ No errors in backend logs for past 10 minutes
 5. ✅ You can log in to admin dashboard and customer portal

@@ -100,8 +100,6 @@ else
 
 storage:
   dbPath: /var/lib/mongodb
-  journal:
-    enabled: true
   wiredTiger:
     engineConfig:
       cacheSizeGB: 0.5
