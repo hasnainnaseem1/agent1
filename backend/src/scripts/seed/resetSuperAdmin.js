@@ -106,133 +106,80 @@ function prompt(question, hidden = false) {
     })(__dirname);
     const { User } = require(path.join(srcDir, 'models/user'));
 
-    const superAdmin = await User.findOne({ role: 'super_admin' });
+    const superAdmin = await User.collection.findOne({ role: 'super_admin' });
 
     if (superAdmin) {
-      // ── Update existing super admin ──
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      const finalName = newName || superAdmin.name;
+      console.log(`  Found corrupted super admin: ${superAdmin.email} (${superAdmin._id})`);
+      console.log('  Deleting old document and creating fresh one...');
 
-      console.log(`  Found super admin: ${superAdmin.email} (${superAdmin._id})`);
-      console.log('  Updating credentials...');
-
-      // Use Mongoose updateOne (not native driver) for reliability
-      const result = await User.updateOne(
-        { _id: superAdmin._id },
-        {
-          $set: {
-            email:           newEmail,
-            password:        hashedPassword,
-            name:            finalName,
-            status:          'active',
-            isEmailVerified: true,
-            accountType:     'admin',
-            loginAttempts:   0,
-            updatedAt:       new Date(),
-          },
-          $unset: { lockUntil: 1 }
-        }
-      );
-
-      console.log(`  Update result: matched=${result.matchedCount}, modified=${result.modifiedCount}`);
-
-      if (result.matchedCount === 0) {
-        console.error('❌ No document matched! Trying alternative approach...');
-        
-        // Fallback: use native driver with string _id comparison
-        const nativeResult = await User.collection.updateOne(
-          { role: 'super_admin' },
-          {
-            $set: {
-              email:           newEmail,
-              password:        hashedPassword,
-              name:            finalName,
-              status:          'active',
-              isEmailVerified: true,
-              accountType:     'admin',
-              loginAttempts:   0,
-              updatedAt:       new Date(),
-            }
-          }
-        );
-
-        console.log(`  Native result: matched=${nativeResult.matchedCount}, modified=${nativeResult.modifiedCount}`);
-
-        if (nativeResult.matchedCount === 0) {
-          console.error('❌ Still no match. Listing all users with role info:');
-          const allUsers = await User.collection.find({}, { projection: { email: 1, role: 1, accountType: 1, status: 1 } }).toArray();
-          allUsers.forEach(u => console.log(`   - ${u.email} | role: ${u.role} | type: ${u.accountType} | status: ${u.status}`));
-          process.exit(1);
-        }
-      }
-
-      // Verify by reading back
-      const verified = await User.findOne({ email: newEmail, accountType: 'admin' });
-      
-      if (!verified) {
-        console.error('❌ Could not read back the updated user!');
-        // Debug: list all users
-        const allUsers = await User.collection.find({}, { projection: { email: 1, role: 1, accountType: 1 } }).toArray();
-        console.log('  All users in database:');
-        allUsers.forEach(u => console.log(`   - ${u.email} | role: ${u.role} | type: ${u.accountType}`));
-        process.exit(1);
-      }
-
-      const passwordValid = await bcrypt.compare(newPassword, verified.password);
-
-      console.log('');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅ Super Admin credentials updated!');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   ID       : ${verified._id}`);
-      console.log(`   Name     : ${verified.name}`);
-      console.log(`   Email    : ${verified.email}`);
-      console.log(`   Password : ${newPassword}`);
-      console.log(`   Status   : ${verified.status}`);
-      console.log(`   AccType  : ${verified.accountType}`);
-      console.log(`   Role     : ${verified.role}`);
-      console.log(`   Pwd check: ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      if (!passwordValid) {
-        console.error('');
-        console.error('⚠️  Password verification FAILED!');
-        console.error("   Try: NEW_ADMIN_PASSWORD='YourPass@123' node src/scripts/seed/resetSuperAdmin.js");
-      }
+      // Delete the corrupted document using native driver
+      await User.collection.deleteOne({ _id: superAdmin._id });
+      console.log('  ✅ Old document deleted');
     } else {
-      // ── No super admin found — create one ───────────────────────────────
-      console.log('⚠️  No super admin found. Creating one...');
-
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      const result = await User.collection.insertOne({
-        name:            newName || 'Super Admin',
-        email:           newEmail,
-        password:        hashedPassword,
-        accountType:     'admin',
-        role:            'super_admin',
-        status:          'active',
-        isEmailVerified: true,
-        loginAttempts:   0,
-        analysisCount:   0,
-        analysisLimit:   999999,
-        plan:            'unlimited',
-        createdAt:       new Date(),
-        updatedAt:       new Date(),
-      });
-
-      // Verify the password works
-      const verified = await User.collection.findOne({ _id: result.insertedId });
-      const passwordValid = await bcrypt.compare(newPassword, verified.password);
-
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('✅ Super Admin created!');
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log(`   Name     : ${newName || 'Super Admin'}`);
-      console.log(`   Email    : ${newEmail}`);
-      console.log(`   Password : ${newPassword}`);
-      console.log(`   Pwd check: ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('  No existing super admin found. Creating new one...');
     }
+
+    // Create a completely fresh super admin document
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const now = new Date();
+    const finalName = newName || (superAdmin && superAdmin.name) || 'Super Admin';
+
+    const newDoc = {
+      name:            finalName,
+      email:           newEmail,
+      password:        hashedPassword,
+      phone:           '',
+      accountType:     'admin',
+      role:            'super_admin',
+      customRole:      null,
+      status:          'active',
+      isEmailVerified: true,
+      plan:            'unlimited',
+      currentPlan:     null,
+      analysisCount:   0,
+      analysisLimit:   999999,
+      loginAttempts:   0,
+      passwordChangeRequired: false,
+      lastLogin:       now,
+      createdAt:       now,
+      updatedAt:       now,
+      __v:             0,
+    };
+
+    const insertResult = await User.collection.insertOne(newDoc);
+    console.log(`  ✅ New document created: ${insertResult.insertedId}`);
+
+    // Verify the new document works with Mongoose
+    const verified = await User.findOne({ _id: insertResult.insertedId });
+
+    if (!verified) {
+      console.error('❌ Could not read back the new user with Mongoose!');
+      process.exit(1);
+    }
+
+    // Verify password
+    const passwordValid = await bcrypt.compare(newPassword, verified.password);
+
+    // Verify Mongoose updateOne works on the new doc
+    const testUpdate = await User.updateOne(
+      { _id: verified._id },
+      { $set: { updatedAt: new Date() } }
+    );
+
+    console.log('');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('✅ Super Admin ready!');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`   ID        : ${verified._id}`);
+    console.log(`   Name      : ${verified.name}`);
+    console.log(`   Email     : ${verified.email}`);
+    console.log(`   Password  : ${newPassword}`);
+    console.log(`   Status    : ${verified.status}`);
+    console.log(`   AccType   : ${verified.accountType}`);
+    console.log(`   Role      : ${verified.role}`);
+    console.log(`   Pwd check : ${passwordValid ? '✅ PASS' : '❌ FAIL'}`);
+    console.log(`   Mongoose  : ${testUpdate.matchedCount === 1 ? '✅ PASS' : '❌ FAIL'}`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     console.log('');
     console.log('  Login at: https://me.sellsera.com');
