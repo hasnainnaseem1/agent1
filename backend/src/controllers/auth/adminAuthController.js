@@ -8,6 +8,9 @@ const { getSecuritySettings, msToJwtExpiry, validatePassword } = require('../../
 
 // Generate JWT token with dynamic session timeout
 const generateToken = (userId, sessionTimeoutMs) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured in the environment variables');
+  }
   const expiresIn = sessionTimeoutMs ? msToJwtExpiry(sessionTimeoutMs) : '7d';
   return jwt.sign(
     { userId }, 
@@ -182,7 +185,7 @@ const login = async (req, res) => {
     console.error('Admin login error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error logging in'
+      message: error.message || 'Error logging in'
     });
   }
 };
