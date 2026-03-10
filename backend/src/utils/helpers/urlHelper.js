@@ -64,9 +64,11 @@ function resolveUploadUrls(value, baseUrl) {
   }
 
   if (value && typeof value === 'object' && !(value instanceof Date) && !(value._bsontype)) {
+    // Convert Mongoose documents to plain objects
+    const plain = (typeof value.toObject === 'function') ? value.toObject() : value;
     const out = {};
-    for (const key of Object.keys(value)) {
-      out[key] = resolveUploadUrls(value[key], baseUrl);
+    for (const key of Object.keys(plain)) {
+      out[key] = resolveUploadUrls(plain[key], baseUrl);
     }
     return out;
   }
@@ -104,9 +106,11 @@ function stripUploadHosts(value) {
   }
 
   if (value && typeof value === 'object' && !(value instanceof Date) && !(value._bsontype)) {
+    // Convert Mongoose documents to plain objects
+    const plain = (typeof value.toObject === 'function') ? value.toObject() : value;
     const out = {};
-    for (const key of Object.keys(value)) {
-      out[key] = stripUploadHosts(value[key]);
+    for (const key of Object.keys(plain)) {
+      out[key] = stripUploadHosts(plain[key]);
     }
     return out;
   }

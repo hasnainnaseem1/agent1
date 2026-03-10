@@ -234,8 +234,20 @@ const getMe = async (req, res) => {
     const user = await User.findById(req.userId)
       .select('-password')
       .populate('customRole', 'name permissions');
-    
-    const permissions = await user.getPermissions();
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    let permissions = [];
+    try {
+      permissions = await user.getPermissions();
+    } catch (permErr) {
+      console.error('Failed to get permissions:', permErr.message);
+    }
 
     res.json({
       success: true,
@@ -273,19 +285,23 @@ const logout = async (req, res) => {
   try {
     const clientIP = getClientIP(req);
 
-    // Log logout activity
-    await ActivityLog.logActivity({
-      userId: req.userId,
-      userName: req.user.name,
-      userEmail: req.user.email,
-      userRole: req.user.role,
-      action: 'logout',
-      actionType: 'auth',
-      description: 'Admin logged out',
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    // Log logout activity (non-critical)
+    try {
+      await ActivityLog.logActivity({
+        userId: req.userId,
+        userName: req.user.name,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        action: 'logout',
+        actionType: 'auth',
+        description: 'Admin logged out',
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log logout activity:', logErr.message);
+    }
 
     res.json({
       success: true,
@@ -355,21 +371,25 @@ const changePassword = async (req, res) => {
     }
     await user.save();
 
-    // Log password change
-    await ActivityLog.logActivity({
-      userId: user._id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      action: 'password_reset',
-      actionType: 'auth',
-      description: user.role === 'super_admin' 
-        ? 'Super admin password changed' 
-        : 'First login password changed successfully',
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    // Log password change (non-critical)
+    try {
+      await ActivityLog.logActivity({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'password_reset',
+        actionType: 'auth',
+        description: user.role === 'super_admin' 
+          ? 'Super admin password changed' 
+          : 'First login password changed successfully',
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log password change activity:', logErr.message);
+    }
 
     res.json({
       success: true,
@@ -415,19 +435,23 @@ const updateProfile = async (req, res) => {
     user.updatedAt = Date.now();
     await user.save();
 
-    // Log profile update
-    await ActivityLog.logActivity({
-      userId: user._id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      action: 'profile_update',
-      actionType: 'user',
-      description: 'Admin profile updated',
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    // Log profile update (non-critical)
+    try {
+      await ActivityLog.logActivity({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'profile_update',
+        actionType: 'user',
+        description: 'Admin profile updated',
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log profile update activity:', logErr.message);
+    }
 
     // Return updated user without password
     const userObj = user.toObject();
@@ -484,19 +508,23 @@ const forgotPassword = async (req, res) => {
       user.passwordResetExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
       await user.save();
 
-      // Log this request
-      await ActivityLog.logActivity({
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        userRole: user.role,
-        action: 'password_reset_request',
-        actionType: 'security',
-        description: 'Super Admin requested password reset',
-        ipAddress: clientIP,
-        userAgent: req.get('user-agent'),
-        status: 'success'
-      });
+      // Log this request (non-critical)
+      try {
+        await ActivityLog.logActivity({
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'password_reset_request',
+          actionType: 'security',
+          description: 'Super Admin requested password reset',
+          ipAddress: clientIP,
+          userAgent: req.get('user-agent'),
+          status: 'success'
+        });
+      } catch (logErr) {
+        console.error('Failed to log password reset request activity:', logErr.message);
+      }
 
       res.json({
         success: true,
@@ -519,22 +547,26 @@ const forgotPassword = async (req, res) => {
       // Notify super admin(s) with in-app + email notification
       notifyPasswordResetRequest({ requestUser: user, method: 'forgot_password' }).catch(() => {});
 
-      // Log the password reset request
-      await ActivityLog.logActivity({
-        userId: user._id,
-        userName: user.name,
-        userEmail: user.email,
-        userRole: user.role,
-        action: 'password_reset',
-        actionType: 'auth',
-        targetModel: 'User',
-        targetId: superAdmin._id,
-        targetName: superAdmin.name,
-        description: `${user.name} requested password reset (forgot password)`,
-        ipAddress: clientIP,
-        userAgent: req.get('user-agent'),
-        status: 'success'
-      });
+      // Log the password reset request (non-critical)
+      try {
+        await ActivityLog.logActivity({
+          userId: user._id,
+          userName: user.name,
+          userEmail: user.email,
+          userRole: user.role,
+          action: 'password_reset',
+          actionType: 'auth',
+          targetModel: 'User',
+          targetId: superAdmin._id,
+          targetName: superAdmin.name,
+          description: `${user.name} requested password reset (forgot password)`,
+          ipAddress: clientIP,
+          userAgent: req.get('user-agent'),
+          status: 'success'
+        });
+      } catch (logErr) {
+        console.error('Failed to log password reset request activity:', logErr.message);
+      }
 
       res.json({
         success: true,
@@ -679,23 +711,27 @@ const resetPasswordForUser = async (req, res) => {
     }
     await targetUser.save();
 
-    // Log this action
+    // Log this action (non-critical)
     const clientIP = getClientIP(req);
-    await ActivityLog.logActivity({
-      userId: req.userId,
-      userName: req.user.name,
-      userEmail: req.user.email,
-      userRole: req.user.role,
-      action: 'password_reset',
-      actionType: 'security',
-      targetModel: 'User',
-      targetId: targetUser._id,
-      targetName: targetUser.name,
-      description: `Reset password for admin user: ${targetUser.email}`,
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    try {
+      await ActivityLog.logActivity({
+        userId: req.userId,
+        userName: req.user.name,
+        userEmail: req.user.email,
+        userRole: req.user.role,
+        action: 'password_reset',
+        actionType: 'security',
+        targetModel: 'User',
+        targetId: targetUser._id,
+        targetName: targetUser.name,
+        description: `Reset password for admin user: ${targetUser.email}`,
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log reset password activity:', logErr.message);
+    }
 
     res.json({
       success: true,
@@ -741,22 +777,26 @@ const requestPasswordReset = async (req, res) => {
       });
     }
 
-    // Log the password reset request
-    await ActivityLog.logActivity({
-      userId: user._id,
-      userName: user.name,
-      userEmail: user.email,
-      userRole: user.role,
-      action: 'password_reset',
-      actionType: 'auth',
-      targetModel: 'User',
-      targetId: superAdmin._id,
-      targetName: superAdmin.name,
-      description: `${user.name} (${user.email}) requested password reset`,
-      ipAddress: clientIP,
-      userAgent: req.get('user-agent'),
-      status: 'success'
-    });
+    // Log the password reset request (non-critical)
+    try {
+      await ActivityLog.logActivity({
+        userId: user._id,
+        userName: user.name,
+        userEmail: user.email,
+        userRole: user.role,
+        action: 'password_reset',
+        actionType: 'auth',
+        targetModel: 'User',
+        targetId: superAdmin._id,
+        targetName: superAdmin.name,
+        description: `${user.name} (${user.email}) requested password reset`,
+        ipAddress: clientIP,
+        userAgent: req.get('user-agent'),
+        status: 'success'
+      });
+    } catch (logErr) {
+      console.error('Failed to log password reset request activity:', logErr.message);
+    }
 
     // Notify super admin(s) with in-app + email notification
     notifyPasswordResetRequest({ requestUser: user, method: 'request_reset' }).catch(() => {});
