@@ -3,6 +3,7 @@ const User = require('../../models/user/User');
 const ActivityLog = require('../../models/admin/ActivityLog');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * GET /api/v1/admin/departments
@@ -21,7 +22,7 @@ const getDepartments = async (req, res) => {
     
     // Search by name
     if (search) {
-      query.name = { $regex: search, $options: 'i' };
+      query.name = { $regex: escapeRegex(search), $options: 'i' };
     }
     
     const departments = await Department.find(query)

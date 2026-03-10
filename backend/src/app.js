@@ -55,6 +55,11 @@ const routes = require('./routes');
 // Mount API routes
 app.use('/api', routes);
 
+// Health check — top-level (outside /api prefix)
+app.get('/health', (req, res) => {
+  res.json({ success: true, message: 'Server is running', timestamp: new Date().toISOString() });
+});
+
 // Root endpoint - Simplified response
 app.get('/', (req, res) => {
   // For testing/development - show basic info

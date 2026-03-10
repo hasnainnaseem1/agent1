@@ -19,7 +19,7 @@ async function run() {
     await request('PUT', '/api/v1/admin/seo/settings', {
       token, body: {
         socialLinks: { facebook: 'https://facebook.com/sellsera', twitter: 'https://x.com/sellsera' },
-        socialLinksEnabled: true,
+        socialLinksEnabled: { facebook: true, twitter: true, linkedin: true, instagram: true, youtube: true },
         customSocialLinks: []
       }
     }),

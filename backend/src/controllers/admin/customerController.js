@@ -3,6 +3,7 @@ const { ActivityLog } = require('../../models/admin');
 const { Analysis } = require('../../models/customer');
 const { Notification } = require('../../models/notification');
 const { Plan } = require('../../models/subscription');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 const { Payment } = require('../../models/payment');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { notifySubscriptionChange, notifyCustomerStatusChange } = require('../../services/notification/adminNotifier');
@@ -51,9 +52,10 @@ const getCustomers = async (req, res) => {
     if (isEmailVerified !== undefined) filter.isEmailVerified = isEmailVerified === 'true';
     
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } }
       ];
     }
 
@@ -155,9 +157,10 @@ const exportCustomersCsv = async (req, res) => {
     if (isEmailVerified !== undefined) filter.isEmailVerified = isEmailVerified === 'true';
     
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } }
       ];
     }
 
@@ -1217,9 +1220,10 @@ const updateCustomerStatus = async (req, res) => {
 
     const oldStatus = customer.status;
     if (oldStatus === status) {
-      return res.status(400).json({
-        success: false,
-        message: `Customer is already ${status}`
+      return res.json({
+        success: true,
+        message: `Customer is already ${status}`,
+        customer: { _id: customer._id, name: customer.name, email: customer.email, status: customer.status }
       });
     }
 

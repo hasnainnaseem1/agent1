@@ -30,7 +30,10 @@ router.use('/settings', adminAuth, settingsRoutes);
 router.use('/departments', adminAuth, departmentsRoutes);
 router.use('/plans', adminAuth, plansRoutes);
 router.use('/features', adminAuth, featuresRoutes);
-router.use('/dev-utils', adminAuth, devUtilsRoutes);
+// Dev utilities — only in non-production environments
+if (process.env.NODE_ENV !== 'production') {
+  router.use('/dev-utils', adminAuth, devUtilsRoutes);
+}
 router.use('/marketing', adminAuth, marketingRoutes);
 router.use('/blog', adminAuth, blogRoutes);
 router.use('/seo', adminAuth, seoRoutes);

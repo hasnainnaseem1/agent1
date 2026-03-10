@@ -182,7 +182,7 @@ const googleSSO = async (req, res) => {
         const defaultPlan = await Plan.findOne({ isDefault: true, isActive: true });
         if (defaultPlan) {
           user.currentPlan = defaultPlan._id;
-          user.plan = defaultPlan.slug || defaultPlan.name.toLowerCase().includes('free') ? 'free' : user.plan;
+          user.plan = defaultPlan.slug || (defaultPlan.name.toLowerCase().includes('free') ? 'free' : user.plan);
           user.analysisLimit = defaultPlan.features?.find(f => f.featureKey === 'analysis_limit')?.value || 1;
           user.planSnapshot = {
             planId: defaultPlan._id,
@@ -923,7 +923,7 @@ const updateProfile = async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       req.userId,
-      { name: name.trim(), ...(phone !== undefined && { phone: phone.trim() }) },
+      { name: name.trim(), ...(phone !== undefined && { phone: String(phone || '').trim() }) },
       { new: true, runValidators: true }
     ).select('-password -emailVerificationToken');
 

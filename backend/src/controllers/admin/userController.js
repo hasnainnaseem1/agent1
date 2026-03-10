@@ -5,6 +5,7 @@ const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { formatUserResponse } = require('../../utils/helpers/userFormatter');
 const { validatePassword } = require('../../utils/helpers/securityHelper');
 const { safeSave, safeActivityLog, safeNotification } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 // @route   GET /api/admin/users
 // @desc    Get all users (customers + admins) with pagination and filters
@@ -44,9 +45,10 @@ const getUsers = async (req, res) => {
     
     // Search by name or email
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } }
       ];
     }
 
@@ -128,9 +130,10 @@ const exportUsersCSV = async (req, res) => {
     
     // Search by name or email
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { email: { $regex: safe, $options: 'i' } }
       ];
     }
 

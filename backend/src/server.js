@@ -40,6 +40,15 @@ const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const startServer = async () => {
+  // Warn about missing frontend URL env vars (email links will use localhost)
+  const missingEnvVars = [];
+  if (!process.env.CUSTOMER_FRONTEND_URL) missingEnvVars.push('CUSTOMER_FRONTEND_URL');
+  if (!process.env.FRONTEND_URL) missingEnvVars.push('FRONTEND_URL');
+  if (!process.env.ADMIN_FRONTEND_URL) missingEnvVars.push('ADMIN_FRONTEND_URL');
+  if (missingEnvVars.length > 0) {
+    console.warn(`⚠️  Missing env vars: ${missingEnvVars.join(', ')} — email links will fallback to localhost!`);
+  }
+
   // Connect to database first
   await connectDB();
   

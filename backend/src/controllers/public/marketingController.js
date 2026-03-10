@@ -9,26 +9,39 @@ const { resolveFromReq } = require('../../utils/helpers/urlHelper');
 const getSiteSettings = async (req, res) => {
   try {
     const settings = await AdminSettings.getSettings();
-    res.set('Cache-Control', 'no-store');
+    const theme = settings.themeSettings || {};
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     res.json(resolveFromReq({
       success: true,
       site: {
-        // General fields are top-level in AdminSettings
+        // General fields
         siteName: settings.siteName || '',
         siteDescription: settings.siteDescription || '',
         contactEmail: settings.contactEmail || '',
         supportEmail: settings.supportEmail || '',
-        // Theme / Branding (nested under themeSettings)
-        primaryColor: settings.themeSettings?.primaryColor || '#7c3aed',
-        secondaryColor: settings.themeSettings?.secondaryColor || '#3b82f6',
-        accentColor: settings.themeSettings?.accentColor || '#f59e0b',
-        logoUrl: settings.themeSettings?.logoUrl || '',
-        logoSmallUrl: settings.themeSettings?.logoSmallUrl || '',
-        faviconUrl: settings.themeSettings?.faviconUrl || '',
-        companyName: settings.themeSettings?.companyName || settings.themeSettings?.appName || settings.siteName || '',
-        appTagline: settings.themeSettings?.appTagline || '',
-        appDescription: settings.themeSettings?.appDescription || '',
-        // Feature flags (nested under features)
+        // Full themeSettings object (for frontend flexibility)
+        themeSettings: theme,
+        // Flattened theme fields (backward compatibility)
+        appName: theme.appName || settings.siteName || '',
+        primaryColor: theme.primaryColor || '#7c3aed',
+        secondaryColor: theme.secondaryColor || '#3b82f6',
+        accentColor: theme.accentColor || '#f59e0b',
+        logoUrl: theme.logoUrl || '',
+        logoSmallUrl: theme.logoSmallUrl || '',
+        faviconUrl: theme.faviconUrl || '',
+        companyName: theme.companyName || theme.appName || settings.siteName || '',
+        appTagline: theme.appTagline || '',
+        appDescription: theme.appDescription || '',
+        primaryService: theme.primaryService || '',
+        secondaryService: theme.secondaryService || '',
+        targetPlatform: theme.targetPlatform || '',
+        toolType: theme.toolType || '',
+        welcomeTitle: theme.welcomeTitle || '',
+        welcomeMessage: theme.welcomeMessage || '',
+        emailVerificationMessage: theme.emailVerificationMessage || '',
+        // Feature flags
         enableCustomerSignup: settings.features?.enableCustomerSignup !== false,
         enableLogin: settings.features?.enableLogin !== false,
         enableAnalysis: settings.features?.enableAnalysis !== false,

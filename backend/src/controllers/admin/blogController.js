@@ -3,6 +3,7 @@ const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { toRelativeUploadPath, resolveFromReq } = require('../../utils/helpers/urlHelper');
 const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * GET /api/v1/admin/blog/posts
@@ -35,9 +36,10 @@ const listPosts = async (req, res) => {
     }
 
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
+        { title: { $regex: safe, $options: 'i' } },
+        { tags: { $regex: safe, $options: 'i' } },
       ];
     }
 

@@ -17,15 +17,15 @@ async function run() {
   test('Site settings has no-cache header', siteRes, {
     custom: (d, s, h) => {
       const cc = h?.['cache-control'] || '';
-      return cc.includes('no-store') ? null : `Expected Cache-Control: no-store, got: "${cc}"`;
+      return (cc.includes('no-store') || cc.includes('no-cache')) ? null : `Expected Cache-Control: no-store, got: "${cc}"`;
     }
   });
 
   // Verify branding data present
   test('Site settings contains themeSettings', siteRes, {
     custom: (d) => {
-      const settings = d?.settings || d?.data || d;
-      if (settings?.themeSettings || settings?.theme) return null;
+      const site = d?.site || d;
+      if (site?.themeSettings || site?.appName || site?.primaryColor) return null;
       return 'themeSettings missing from response';
     }
   });

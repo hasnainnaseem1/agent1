@@ -3,6 +3,7 @@ const { ActivityLog } = require('../../models/admin');
 const User = require('../../models/user/User');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * List all plans (paginated, filterable)
@@ -31,9 +32,10 @@ const listPlans = async (req, res) => {
     }
 
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } }
       ];
     }
 
@@ -120,7 +122,8 @@ const createPlan = async (req, res) => {
     } = req.body;
 
     // Check uniqueness
-    const existing = await Plan.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+    const escapedName = escapeRegex(name);
+    const existing = await Plan.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
     if (existing) {
       return res.status(400).json({ success: false, message: 'A plan with this name already exists' });
     }
@@ -223,8 +226,9 @@ const updatePlan = async (req, res) => {
 
     // Check name uniqueness if name is changing
     if (name && name !== plan.name) {
+      const escapedName = escapeRegex(name);
       const existing = await Plan.findOne({
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
         _id: { $ne: plan._id }
       });
       if (existing) {
@@ -526,9 +530,10 @@ const exportPlans = async (req, res) => {
     }
 
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } }
       ];
     }
 

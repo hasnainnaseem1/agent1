@@ -3,6 +3,7 @@ const { ActivityLog } = require('../../models/admin');
 const { Plan } = require('../../models/subscription');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * List all features (paginated, filterable)
@@ -47,10 +48,11 @@ const listFeatures = async (req, res) => {
     }
     
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { featureKey: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
+        { name: { $regex: safe, $options: 'i' } },
+        { featureKey: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } },
       ];
     }
 
@@ -109,10 +111,21 @@ const getFeature = async (req, res) => {
  */
 const createFeature = async (req, res) => {
   try {
-    const { name, featureKey, description, type, defaultValue, unit, category, isActive, displayOrder } = req.body;
+    const { name, description, type, defaultValue, unit, category, isActive, displayOrder } = req.body;
+    let { featureKey } = req.body;
 
-    // Check uniqueness
-    const existingName = await Feature.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Feature name is required' });
+    }
+
+    // Auto-generate featureKey from name if not provided
+    if (!featureKey || typeof featureKey !== 'string' || !featureKey.trim()) {
+      featureKey = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    }
+
+    // Check uniqueness — escape regex special chars to prevent injection
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingName = await Feature.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') } });
     if (existingName) {
       return res.status(400).json({ success: false, message: 'A feature with this name already exists' });
     }
@@ -177,7 +190,8 @@ const updateFeature = async (req, res) => {
     const { name, description, type, defaultValue, unit, category, isActive, displayOrder } = req.body;
 
     if (name && name !== feature.name) {
-      const existing = await Feature.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') }, _id: { $ne: feature._id } });
+      const escapedName = escapeRegex(name);
+      const existing = await Feature.findOne({ name: { $regex: new RegExp(`^${escapedName}$`, 'i') }, _id: { $ne: feature._id } });
       if (existing) {
         return res.status(400).json({ success: false, message: 'A feature with this name already exists' });
       }
@@ -344,10 +358,11 @@ const exportFeatures = async (req, res) => {
     }
 
     if (search) {
+      const safe = escapeRegex(search);
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { featureKey: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { name: { $regex: safe, $options: 'i' } },
+        { featureKey: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } }
       ];
     }
 

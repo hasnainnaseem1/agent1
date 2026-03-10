@@ -5,6 +5,9 @@ const AdminSettings = require('../../models/admin/AdminSettings');
  * Well-known, trusted email domains that should NEVER be blocked.
  * These bypass the blocked-domains list AND the MX-record check.
  */
+// Runtime cache — populated from DB if helper functions are called directly
+let TEMP_EMAIL_DOMAINS = [];
+
 const TRUSTED_DOMAINS = new Set([
   // Google
   'gmail.com', 'googlemail.com', 'google.com',

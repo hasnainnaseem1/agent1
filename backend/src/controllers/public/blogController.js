@@ -1,5 +1,6 @@
 const BlogPost = require('../../models/admin/BlogPost');
 const { resolveFromReq } = require('../../utils/helpers/urlHelper');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * GET /api/v1/public/blog/posts
@@ -20,10 +21,11 @@ const getPosts = async (req, res) => {
 
     // Search in title, excerpt, tags
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { excerpt: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
+        { title: { $regex: safe, $options: 'i' } },
+        { excerpt: { $regex: safe, $options: 'i' } },
+        { tags: { $regex: safe, $options: 'i' } },
       ];
     }
 

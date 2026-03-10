@@ -1,6 +1,7 @@
 const { AdminSettings, SeoRedirect } = require('../../models/admin');
 const { resolveFromReq, toRelativeUploadPath, stripUploadHosts } = require('../../utils/helpers/urlHelper');
 const { safeSave } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * GET /api/v1/admin/seo/settings
@@ -44,9 +45,15 @@ const updateSettings = async (req, res) => {
     if (googleSearchConsoleVerification !== undefined) settings.seoSettings.googleSearchConsoleVerification = googleSearchConsoleVerification;
     if (bingVerification !== undefined) settings.seoSettings.bingVerification = bingVerification;
     if (defaultOgImage !== undefined) settings.seoSettings.defaultOgImage = toRelativeUploadPath(defaultOgImage);
-    if (socialLinks !== undefined) settings.seoSettings.socialLinks = socialLinks;
-    if (socialLinksEnabled !== undefined) settings.seoSettings.socialLinksEnabled = socialLinksEnabled;
-    if (customSocialLinks !== undefined) settings.seoSettings.customSocialLinks = stripUploadHosts(customSocialLinks);
+    if (socialLinks && typeof socialLinks === 'object' && !Array.isArray(socialLinks)) {
+      settings.seoSettings.socialLinks = socialLinks;
+    }
+    if (socialLinksEnabled && typeof socialLinksEnabled === 'object' && !Array.isArray(socialLinksEnabled)) {
+      settings.seoSettings.socialLinksEnabled = socialLinksEnabled;
+    }
+    if (customSocialLinks !== undefined) {
+      settings.seoSettings.customSocialLinks = Array.isArray(customSocialLinks) ? stripUploadHosts(customSocialLinks) : [];
+    }
     if (enableSitemap !== undefined) settings.seoSettings.enableSitemap = enableSitemap;
     if (robotsTxtCustom !== undefined) settings.seoSettings.robotsTxtCustom = robotsTxtCustom;
     if (customHeadScripts !== undefined) settings.seoSettings.customHeadScripts = customHeadScripts;
@@ -72,10 +79,11 @@ const getRedirects = async (req, res) => {
     const filter = {};
 
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { fromPath: { $regex: search, $options: 'i' } },
-        { toPath: { $regex: search, $options: 'i' } },
-        { note: { $regex: search, $options: 'i' } },
+        { fromPath: { $regex: safe, $options: 'i' } },
+        { toPath: { $regex: safe, $options: 'i' } },
+        { note: { $regex: safe, $options: 'i' } },
       ];
     }
     if (status === 'active') filter.isActive = true;

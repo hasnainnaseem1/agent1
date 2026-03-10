@@ -3,6 +3,7 @@ const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { stripUploadHosts, resolveFromReq } = require('../../utils/helpers/urlHelper');
 const { safeSave, safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 /**
  * GET /api/v1/admin/marketing/pages
@@ -13,7 +14,7 @@ const getPages = async (req, res) => {
     const { status, search } = req.query;
     const filter = {};
     if (status) filter.status = status;
-    if (search) filter.title = { $regex: search, $options: 'i' };
+    if (search) filter.title = { $regex: escapeRegex(search), $options: 'i' };
 
     const pages = await MarketingPage.find(filter)
       .select('title slug status isHomePage showInNavigation navigationOrder updatedAt')

@@ -21,7 +21,7 @@ async function run() {
   const createRes = await request('POST', '/api/v1/admin/features', {
     token, body: {
       name: `test_feature_${ts}`,
-      displayName: `Test Feature ${ts}`,
+      featureKey: `test_feature_${ts}`,
       description: 'Auto-test feature',
       type: 'boolean',
       category: 'testing',

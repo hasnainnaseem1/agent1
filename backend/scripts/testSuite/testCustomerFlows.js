@@ -53,7 +53,7 @@ async function run() {
     { status: 200, success: true }
   );
 
-  // ── Create Stripe Checkout (will fail without Stripe config — test endpoint responds) ──
+  // ── Create Stripe Checkout (returns 503 if payment gateway not configured, 400 for invalid plan) ──
   test('POST /customer/billing/checkout — endpoint responds',
     await request('POST', '/api/v1/customer/billing/checkout', {
       token, body: { planId: 'nonexistent' }
@@ -61,7 +61,7 @@ async function run() {
     { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 ? `Server error ${s}` : null) }
   );
 
-  // ── Stripe Portal (should error gracefully without Stripe) ──
+  // ── Stripe Portal (returns 503 if payment gateway not configured) ──
   test('POST /customer/billing/portal — endpoint responds',
     await request('POST', '/api/v1/customer/billing/portal', { token }),
     { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 ? `Server error ${s}` : null) }

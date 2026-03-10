@@ -1,6 +1,7 @@
 const { ActivityLog } = require('../../models/admin');
 const { getClientIP } = require('../../utils/helpers/ipHelper');
 const { safeActivityLog } = require('../../utils/helpers/safeDbOps');
+const escapeRegex = require('../../utils/helpers/escapeRegex');
 
 // @desc    Get activity logs with filters
 const getLogs = async (req, res) => {
@@ -45,11 +46,12 @@ const getLogs = async (req, res) => {
     }
     
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { userName: { $regex: search, $options: 'i' } },
-        { userEmail: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { action: { $regex: search, $options: 'i' } }
+        { userName: { $regex: safe, $options: 'i' } },
+        { userEmail: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } },
+        { action: { $regex: safe, $options: 'i' } }
       ];
     }
 
@@ -335,11 +337,12 @@ const exportLogsCsv = async (req, res) => {
     }
 
     if (search) {
+      const safe = escapeRegex(search);
       filter.$or = [
-        { userName: { $regex: search, $options: 'i' } },
-        { userEmail: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } },
-        { action: { $regex: search, $options: 'i' } }
+        { userName: { $regex: safe, $options: 'i' } },
+        { userEmail: { $regex: safe, $options: 'i' } },
+        { description: { $regex: safe, $options: 'i' } },
+        { action: { $regex: safe, $options: 'i' } }
       ];
     }
 

@@ -35,6 +35,16 @@ const createCheckout = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Plan ID is required' });
     }
 
+    // Pre-check: is a payment gateway configured?
+    const gwSettings = await AdminSettings.findOne().select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
+    const gw = gwSettings?.activePaymentGateway || 'stripe';
+    if (gw === 'stripe' && !gwSettings?.stripeSettings?.secretKey) {
+      return res.status(503).json({ success: false, message: 'Payment gateway (Stripe) is not configured. Contact admin.' });
+    }
+    if (gw === 'lemonsqueezy' && !gwSettings?.lemonSqueezySettings?.apiKey) {
+      return res.status(503).json({ success: false, message: 'Payment gateway (LemonSqueezy) is not configured. Contact admin.' });
+    }
+
     const plan = await Plan.findById(planId);
     if (!plan || !plan.isActive) {
       return res.status(404).json({ success: false, message: 'Plan not found or inactive' });
@@ -87,6 +97,16 @@ const createCheckout = async (req, res) => {
  */
 const createPortal = async (req, res) => {
   try {
+    // Pre-check: is a payment gateway configured?
+    const gwSettings = await AdminSettings.findOne().select('activePaymentGateway stripeSettings lemonSqueezySettings').lean();
+    const gwCheck = gwSettings?.activePaymentGateway || 'stripe';
+    if (gwCheck === 'stripe' && !gwSettings?.stripeSettings?.secretKey) {
+      return res.status(503).json({ success: false, message: 'Payment gateway (Stripe) is not configured. Contact admin.' });
+    }
+    if (gwCheck === 'lemonsqueezy' && !gwSettings?.lemonSqueezySettings?.apiKey) {
+      return res.status(503).json({ success: false, message: 'Payment gateway (LemonSqueezy) is not configured. Contact admin.' });
+    }
+
     const gateway = await getActiveGateway();
 
     if (gateway === 'lemonsqueezy') {
