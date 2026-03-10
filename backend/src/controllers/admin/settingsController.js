@@ -575,6 +575,11 @@ const updateThemeSettings = async (req, res) => {
 
     settings.markModified('themeSettings');
     await safeSave(settings);
+    // Direct update to guarantee nested themeSettings persists
+    await AdminSettings.updateOne(
+      { _id: settings._id },
+      { $set: { themeSettings: settings.themeSettings } }
+    );
 
     // Log activity
     await safeActivityLog(ActivityLog, {
@@ -704,8 +709,14 @@ const addBlockedDomain = async (req, res) => {
 
     domains.push(domain);
     settings.customerSettings.blockedTemporaryEmailDomains = domains;
+    settings.markModified('customerSettings');
     settings.lastUpdatedBy = req.userId;
     await safeSave(settings);
+    // Direct update to guarantee nested array persists
+    await AdminSettings.updateOne(
+      { _id: settings._id },
+      { $addToSet: { 'customerSettings.blockedTemporaryEmailDomains': domain } }
+    );
 
     // Log activity
     await safeActivityLog(ActivityLog, {
@@ -765,8 +776,14 @@ const removeBlockedDomain = async (req, res) => {
     }
 
     settings.customerSettings.blockedTemporaryEmailDomains = updatedDomains;
+    settings.markModified('customerSettings');
     settings.lastUpdatedBy = req.userId;
     await safeSave(settings);
+    // Direct update to guarantee nested array persists
+    await AdminSettings.updateOne(
+      { _id: settings._id },
+      { $pull: { 'customerSettings.blockedTemporaryEmailDomains': domain } }
+    );
 
     // Log activity
     await safeActivityLog(ActivityLog, {

@@ -58,13 +58,13 @@ async function run() {
     await request('POST', '/api/v1/customer/billing/checkout', {
       token, body: { planId: 'nonexistent' }
     }),
-    { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 ? `Server error ${s}` : null) }
+    { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 && s !== 503 ? `Server error ${s}` : null) }
   );
 
   // ── Stripe Portal (returns 503 if payment gateway not configured) ──
   test('POST /customer/billing/portal — endpoint responds',
     await request('POST', '/api/v1/customer/billing/portal', { token }),
-    { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 ? `Server error ${s}` : null) }
+    { custom: (d, s) => s === 0 ? 'Network error' : (s >= 500 && s !== 503 ? `Server error ${s}` : null) }
   );
 
   return printSummary('Customer Flows');

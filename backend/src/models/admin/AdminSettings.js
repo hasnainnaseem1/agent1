@@ -558,7 +558,7 @@ adminSettingsSchema.pre('save', function(next) {
 
 // Static method to get settings
 adminSettingsSchema.statics.getSettings = async function() {
-  let settings = await this.findOne();
+  let settings = await this.findOne().sort({ _id: 1 });
   
   if (!settings) {
     // Create with default values to ensure nested defaults are applied
