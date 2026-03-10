@@ -22,7 +22,7 @@ const MarketingPagesListPage = () => {
   const [loading, setLoading] = useState(false);
   const [pages, setPages] = useState([]);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState({ status: [], navigation: [], dateRange: null });
+  const [filters, setFilters] = useState({ status: [], navigation: '', dateRange: null });
   const [cloningId, setCloningId] = useState(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
 
@@ -48,10 +48,10 @@ const MarketingPagesListPage = () => {
   const filteredPages = pages.filter((p) => {
     // Status filter (OR)
     if (filters.status.length > 0 && !filters.status.includes(p.status)) return false;
-    // Navigation filter (OR)
-    if (filters.navigation.length > 0) {
+    // Navigation filter
+    if (filters.navigation) {
       const navVal = p.showInNavigation ? 'yes' : 'no';
-      if (!filters.navigation.includes(navVal)) return false;
+      if (filters.navigation !== navVal) return false;
     }
     // Date range filter
     if (filters.dateRange && filters.dateRange[0] && filters.dateRange[1]) {
@@ -68,11 +68,11 @@ const MarketingPagesListPage = () => {
   const draftPages = pages.filter((p) => p.status === 'draft').length;
   const navPages = pages.filter((p) => p.showInNavigation).length;
 
-  const hasActiveFilters = search || filters.status.length > 0 || filters.navigation.length > 0 || filters.dateRange;
+  const hasActiveFilters = search || filters.status.length > 0 || filters.navigation || filters.dateRange;
 
   const handleClearFilters = () => {
     setSearch('');
-    setFilters({ status: [], navigation: [], dateRange: null });
+    setFilters({ status: [], navigation: '', dateRange: null });
   };
 
   const handleDelete = async (id) => {
@@ -282,17 +282,15 @@ const MarketingPagesListPage = () => {
               maxTagCount="responsive"
             />
             <Select
-              mode="multiple"
               placeholder="Navigation"
               allowClear
-              value={filters.navigation}
-              style={{ minWidth: 160 }}
-              onChange={(v) => setFilters((prev) => ({ ...prev, navigation: v || [] }))}
+              value={filters.navigation || undefined}
+              style={{ minWidth: 170 }}
+              onChange={(v) => setFilters((prev) => ({ ...prev, navigation: v || '' }))}
               options={[
                 { value: 'yes', label: 'In Navigation' },
                 { value: 'no', label: 'Not in Navigation' },
               ]}
-              maxTagCount="responsive"
             />
             <RangePicker
               showTime={{ use12Hours: true, format: 'hh:mm A' }}
