@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { User } = require('../../models/user');
 const { ActivityLog } = require('../../models/admin');
 const { Analysis } = require('../../models/customer');
@@ -38,13 +39,16 @@ const getCustomers = async (req, res) => {
       }
     }
     
-    // Handle multiple plan values (e.g., "free,pro" for multiselect)
+    // Handle plan filter — accepts ObjectIds (dynamic plans) or legacy strings
     if (plan) {
       const planValues = plan.split(',');
-      if (planValues.length === 1) {
-        filter.plan = planValues[0];
+      const isObjectId = planValues.every(v => mongoose.Types.ObjectId.isValid(v));
+      if (isObjectId) {
+        filter.currentPlan = planValues.length === 1
+          ? new mongoose.Types.ObjectId(planValues[0])
+          : { $in: planValues.map(v => new mongoose.Types.ObjectId(v)) };
       } else {
-        filter.plan = { $in: planValues };
+        filter.plan = planValues.length === 1 ? planValues[0] : { $in: planValues };
       }
     }
     
@@ -67,16 +71,19 @@ const getCustomers = async (req, res) => {
 
     const total = await User.countDocuments(filter);
 
-    // Get customer statistics
+    // Get customer statistics (dynamic plans)
+    const allPlans = await Plan.find({ isActive: true }).select('_id name').lean();
+    const planStats = {};
+    for (const p of allPlans) {
+      planStats[p.name] = await User.countDocuments({ accountType: 'customer', currentPlan: p._id });
+    }
+
     const stats = {
       totalCustomers: await User.countDocuments({ accountType: 'customer' }),
       activeCustomers: await User.countDocuments({ accountType: 'customer', status: 'active' }),
       pendingVerification: await User.countDocuments({ accountType: 'customer', status: 'pending_verification' }),
       suspendedCustomers: await User.countDocuments({ accountType: 'customer', status: 'suspended' }),
-      freePlan: await User.countDocuments({ accountType: 'customer', plan: 'free' }),
-      starterPlan: await User.countDocuments({ accountType: 'customer', plan: 'starter' }),
-      proPlan: await User.countDocuments({ accountType: 'customer', plan: 'pro' }),
-      unlimitedPlan: await User.countDocuments({ accountType: 'customer', plan: 'unlimited' }),
+      planStats,
       activeSubscriptions: await User.countDocuments({ 
         accountType: 'customer', 
         subscriptionStatus: 'active' 
@@ -143,13 +150,16 @@ const exportCustomersCsv = async (req, res) => {
       }
     }
     
-    // Handle multiple plan values
+    // Handle plan filter — accepts ObjectIds (dynamic plans) or legacy strings
     if (plan) {
       const planValues = plan.split(',');
-      if (planValues.length === 1) {
-        filter.plan = planValues[0];
+      const isObjectId = planValues.every(v => mongoose.Types.ObjectId.isValid(v));
+      if (isObjectId) {
+        filter.currentPlan = planValues.length === 1
+          ? new mongoose.Types.ObjectId(planValues[0])
+          : { $in: planValues.map(v => new mongoose.Types.ObjectId(v)) };
       } else {
-        filter.plan = { $in: planValues };
+        filter.plan = planValues.length === 1 ? planValues[0] : { $in: planValues };
       }
     }
     
@@ -178,7 +188,7 @@ const exportCustomersCsv = async (req, res) => {
     const rows = customers.map((customer) => [
       customer.name || '',
       customer.email || '',
-      customer.plan || 'free',
+      customer.planSnapshot?.planName || customer.plan || 'Free',
       customer.status || '',
       customer.subscriptionStatus || '',
       customer.analysisCount || 0,

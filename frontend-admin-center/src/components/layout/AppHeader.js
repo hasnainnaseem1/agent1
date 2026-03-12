@@ -138,10 +138,11 @@ const AppHeader = ({ collapsed, setCollapsed }) => {
         <Dropdown menu={dropdownItems} trigger={['click']} placement="bottomRight">
           <Space style={{ cursor: 'pointer' }}>
             <Avatar
-              style={{ backgroundColor: '#7C3AED' }}
-              icon={<UserOutlined />}
+              src={user?.avatar || undefined}
+              style={{ backgroundColor: user?.avatar ? 'transparent' : '#7C3AED' }}
+              icon={!user?.avatar && !user?.name ? <UserOutlined /> : undefined}
             >
-              {user?.name ? getInitials(user.name) : null}
+              {!user?.avatar && user?.name ? getInitials(user.name) : null}
             </Avatar>
             <span style={{ fontWeight: 500 }}>{user?.name}</span>
           </Space>

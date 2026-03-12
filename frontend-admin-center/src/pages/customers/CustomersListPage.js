@@ -318,7 +318,7 @@ const CustomersListPage = () => {
             allowClear
             value={filters.plan}
             onChange={(v) => { setFilters((p) => ({ ...p, plan: v || [] })); setPagination((p) => ({ ...p, current: 1 })); }}
-            options={[{ value: 'free', label: 'Free' }, { value: 'starter', label: 'Starter' }, { value: 'pro', label: 'Pro' }, { value: 'unlimited', label: 'Unlimited' }]}
+            options={availablePlans.map(p => ({ value: p._id, label: p.name }))}
             style={{ minWidth: 150, maxWidth: 280 }}
             maxTagCount="responsive"
           />
