@@ -298,7 +298,9 @@ const CustomersListPage = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="Total" value={stats.totalCustomers || 0} /></Card></Col>
         <Col xs={12} sm={6}><Card size="small"><Statistic title="Active" value={stats.activeCustomers || 0} valueStyle={{ color: '#52c41a' }} /></Card></Col>
-        <Col xs={12} sm={6}><Card size="small"><Statistic title="Pro Plan" value={stats.proPlan || 0} valueStyle={{ color: '#7C3AED' }} /></Card></Col>
+        {stats.planStats && Object.entries(stats.planStats).map(([planName, count]) => (
+          <Col xs={12} sm={6} key={planName}><Card size="small"><Statistic title={`${planName} Plan`} value={count || 0} valueStyle={{ color: '#7C3AED' }} /></Card></Col>
+        ))}
         <Col xs={12} sm={6}><Card size="small"><Statistic title="Subscriptions" value={stats.activeSubscriptions || 0} valueStyle={{ color: '#3B82F6' }} /></Card></Col>
       </Row>
 

@@ -65,6 +65,7 @@ const getCustomers = async (req, res) => {
 
     const customers = await User.find(filter)
       .select('-password -emailVerificationToken -resetPasswordToken')
+      .populate('currentPlan', 'name')
       .sort({ [sortBy]: order === 'desc' ? -1 : 1 })
       .limit(parseInt(limit))
       .skip((parseInt(page) - 1) * parseInt(limit));
@@ -97,7 +98,7 @@ const getCustomers = async (req, res) => {
         name: customer.name,
         email: customer.email,
         status: customer.status,
-        plan: customer.plan,
+        plan: customer.currentPlan?.name || customer.planSnapshot?.planName || customer.plan,
         analysisCount: customer.analysisCount,
         analysisLimit: customer.analysisLimit,
         subscriptionStatus: customer.subscriptionStatus,
@@ -176,6 +177,7 @@ const exportCustomersCsv = async (req, res) => {
 
     const customers = await User.find(filter)
       .select('-password -emailVerificationToken -resetPasswordToken')
+      .populate('currentPlan', 'name')
       .sort({ createdAt: -1 })
       .lean();
 
@@ -188,7 +190,7 @@ const exportCustomersCsv = async (req, res) => {
     const rows = customers.map((customer) => [
       customer.name || '',
       customer.email || '',
-      customer.planSnapshot?.planName || customer.plan || 'Free',
+      customer.currentPlan?.name || customer.planSnapshot?.planName || customer.plan || 'Free',
       customer.status || '',
       customer.subscriptionStatus || '',
       customer.analysisCount || 0,
