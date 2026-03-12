@@ -206,7 +206,7 @@ async function run() {
   // ══════════════════════════════════════════════
   console.log('\n═══ 5. PUBLIC ENDPOINTS ═══');
   const publicEndpoints = [
-    '/api/v1/public/branding',
+    '/api/v1/public/site',
     '/api/v1/public/plans',
     '/api/v1/public/blog/posts',
     '/api/v1/public/marketing/pages/home',
