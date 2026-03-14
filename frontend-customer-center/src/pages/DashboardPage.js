@@ -12,6 +12,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
 import SuccessTracker from "../components/dashboard/SuccessTracker";
+import ConnectShopPrompt from "../components/ConnectShopPrompt";
+import SyncingState from "../components/SyncingState";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useSite } from "../context/SiteContext";
@@ -33,6 +35,10 @@ const DashboardPage = () => {
   const subscriptionsEnabled = siteConfig?.enableSubscriptions !== false;
 
   const [recentAnalyses, setRecentAnalyses] = useState([]);
+  const [shopSyncing, setShopSyncing] = useState(false);
+
+  // Determine if user has connected their shop
+  const hasShop = !!user?.etsyConnected;
 
   const usagePct = user ? Math.round((user.analysisCount / (user.analysisLimit || 1)) * 100) : 0;
   const subStatus = user?.subscriptionStatus || "inactive";
@@ -88,6 +94,31 @@ const DashboardPage = () => {
       gradient: `linear-gradient(135deg, ${colors.warning}, #FB923C)`,
     },
   ];
+
+  // If user hasn't connected their Etsy shop, show the onboarding flow
+  if (!hasShop && !shopSyncing) {
+    return (
+      <AppLayout>
+        <ConnectShopPrompt
+          onConnect={() => {
+            // In production, this would redirect to backend OAuth URL:
+            // window.location.href = `${config.apiUrl}/api/v1/etsy/auth`;
+            setShopSyncing(true);
+          }}
+        />
+      </AppLayout>
+    );
+  }
+
+  if (shopSyncing) {
+    return (
+      <AppLayout>
+        <SyncingState
+          onComplete={() => setShopSyncing(false)}
+        />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

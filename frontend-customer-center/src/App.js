@@ -29,6 +29,7 @@ import ActiveListingsPage from './pages/ActiveListingsPage';
 import CompetitorSalesPage from './pages/CompetitorSalesPage';
 import DeliveryStatusPage from './pages/DeliveryStatusPage';
 import SalesMapPage from './pages/SalesMapPage';
+import UsageQuotasPage from './pages/UsageQuotasPage';
 import { PermissionsProvider } from './context/PermissionsContext';
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ const AppWithTheme = () => {
           <Route path="/listings/active" element={<ProtectedRoute><ActiveListingsPage /></ProtectedRoute>} />
           <Route path="/delivery"     element={<ProtectedRoute><DeliveryStatusPage /></ProtectedRoute>} />
           <Route path="/sales-map"    element={<ProtectedRoute><SalesMapPage /></ProtectedRoute>} />
+          <Route path="/usage"        element={<ProtectedRoute><UsageQuotasPage /></ProtectedRoute>} />
 
           {/* Legacy redirects → Settings tabs */}
           <Route path="/profile"       element={<Navigate to="/settings?tab=profile" replace />} />

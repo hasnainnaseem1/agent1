@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import {
@@ -14,12 +14,14 @@ import {
   ShopOutlined, LineChartOutlined, TruckOutlined,
   EnvironmentOutlined, BarChartOutlined,
   FileSearchOutlined, AuditOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSite } from '../context/SiteContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { colors } from '../theme/tokens';
+import CommandBar from './CommandBar';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -35,6 +37,19 @@ const AppLayout = ({ children }) => {
   const { siteConfig } = useSite();
   const { getFeatureAccess } = usePermissions();
   const [collapsed, setCollapsed] = useState(false);
+  const [cmdBarOpen, setCmdBarOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K listener
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdBarOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -115,6 +130,7 @@ const AppLayout = ({ children }) => {
   ];
 
   const accountItems = [
+    { key: '/usage', icon: <ThunderboltOutlined />, label: 'Usage & Quotas' },
     { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
   ];
 
@@ -320,6 +336,22 @@ const AppLayout = ({ children }) => {
               onClick={() => setCollapsed(!collapsed)}
               style={{ fontSize: 16, width: 40, height: 40, color: isDark ? '#e8e8f0' : '#333' }}
             />
+            {/* Command Bar trigger */}
+            <Tooltip title={`Search  (${navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl'}+K)`}>
+              <Button
+                type="text"
+                icon={<SearchOutlined />}
+                onClick={() => setCmdBarOpen(true)}
+                style={{
+                  fontSize: 14, height: 36, borderRadius: 8,
+                  color: isDark ? '#9090a8' : '#888',
+                  border: `1px solid ${isDark ? '#2e2e4a' : '#e8e8f0'}`,
+                  paddingInline: 12, display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {!collapsed && <span style={{ fontSize: 12, opacity: 0.6 }}>Search…</span>}
+              </Button>
+            </Tooltip>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -359,6 +391,9 @@ const AppLayout = ({ children }) => {
           {children}
         </Content>
       </Layout>
+
+      {/* Command Bar Modal */}
+      <CommandBar open={cmdBarOpen} onClose={() => setCmdBarOpen(false)} />
     </Layout>
   );
 };
