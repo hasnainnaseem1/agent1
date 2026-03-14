@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Form, Input, Button, Checkbox, Divider, Alert, Typography, Space, theme
+  Form, Input, Button, Checkbox, Divider, Alert, Typography, theme
 } from 'antd';
 import {
   MailOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone,

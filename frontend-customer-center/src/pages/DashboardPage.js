@@ -59,11 +59,7 @@ const DashboardPage = () => {
       .catch(() => {});
   }, []);
 
-  const scoreColor = (score) => {
-    if (score >= 80) return colors.success;
-    if (score >= 60) return colors.warning;
-    return colors.danger;
-  };
+
 
   /* ── Command Center Cards ── */
   const commandCards = [

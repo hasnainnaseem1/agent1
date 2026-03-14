@@ -52,4 +52,5 @@ export const usageColor = (used, limit) => {
   return colors.success;
 };
 
-export default { colors, radii, shadows, usageColor };
+const tokens = { colors, radii, shadows, usageColor };
+export default tokens;

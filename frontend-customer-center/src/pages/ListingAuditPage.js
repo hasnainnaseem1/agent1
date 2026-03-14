@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import {
   Row, Col, Card, Form, Input, InputNumber, Select, Button, Typography,
-  Tag, Progress, Tabs, List, Space, Divider, message, theme, Collapse,
+  Tag, Progress, Tabs, List, Space, message, theme, Collapse,
 } from 'antd';
 import {
   SearchOutlined, ThunderboltOutlined, TagsOutlined, DollarOutlined,
   CheckCircleOutlined, CopyOutlined, ArrowLeftOutlined, RocketOutlined,
   BulbOutlined, TrophyOutlined, FileTextOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
 import QuotaBanner from '../components/common/QuotaBanner';
@@ -36,7 +36,7 @@ const scoreColor = (score) => {
 
 const ListingAuditPage = () => {
   const [form] = Form.useForm();
-  const navigate = useNavigate();
+
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
   const { getFeatureAccess, refresh } = usePermissions();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Result, Typography, theme } from 'antd';
+import { Typography, theme } from 'antd';
 import { ToolOutlined } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 

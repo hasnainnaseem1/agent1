@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Form, Input, Button, Alert, Typography, Result, theme } from "antd";
 import { MailOutlined, ArrowLeftOutlined, MoonOutlined, SunOutlined } from "@ant-design/icons";

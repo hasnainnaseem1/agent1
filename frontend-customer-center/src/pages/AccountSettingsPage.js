@@ -7,11 +7,11 @@ import {
 import {
   UserOutlined, LockOutlined, CrownOutlined, ThunderboltOutlined,
   MailOutlined, PhoneOutlined, CalendarOutlined, CheckCircleOutlined,
-  EditOutlined, SaveOutlined, RocketOutlined, CreditCardOutlined,
+  SaveOutlined, RocketOutlined, CreditCardOutlined,
   ArrowRightOutlined, ClockCircleOutlined, ExclamationCircleOutlined,
   SyncOutlined, StopOutlined, PlayCircleOutlined, DollarOutlined,
   WalletOutlined, CloseCircleOutlined, FileTextOutlined, DownloadOutlined,
-  ExportOutlined, SettingOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import AppLayout from "../components/AppLayout";
 import { useAuth } from "../context/AuthContext";

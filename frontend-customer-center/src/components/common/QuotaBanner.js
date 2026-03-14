@@ -13,7 +13,7 @@ import { usePermissions } from '../../context/PermissionsContext';
  */
 const QuotaBanner = ({ featureKey, featureName }) => {
   const [dismissed, setDismissed] = useState(false);
-  const { getFeatureAccess, plan } = usePermissions();
+  const { getFeatureAccess } = usePermissions();
   const navigate = useNavigate();
   const access = getFeatureAccess(featureKey);
 
