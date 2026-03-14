@@ -9,7 +9,11 @@ import {
   LogoutOutlined, MoonOutlined, SunOutlined, MenuFoldOutlined,
   MenuUnfoldOutlined, QuestionCircleOutlined, RocketOutlined,
   SettingOutlined, SearchOutlined, HistoryOutlined,
-  KeyOutlined, TeamOutlined, LockOutlined
+  KeyOutlined, TeamOutlined, LockOutlined,
+  TagsOutlined, OrderedListOutlined, ToolOutlined,
+  ShopOutlined, LineChartOutlined, TruckOutlined,
+  EnvironmentOutlined, BulbOutlined, BarChartOutlined,
+  FileSearchOutlined, AuditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -43,7 +47,7 @@ const AppLayout = ({ children }) => {
   }, [logout, navigate]);
 
   /* ── helper: compact usage pill for sidebar ── */
-  const usagePill = (featureKey) => {
+  const pill = (featureKey) => {
     if (collapsed) return null;
     const a = getFeatureAccess(featureKey);
     if (a.state === 'locked') return <LockOutlined style={{ fontSize: 11, marginLeft: 8, color: BRAND, opacity: 0.7 }} />;
@@ -57,20 +61,59 @@ const AppLayout = ({ children }) => {
     );
   };
 
-  /* ── Feature menu (top section — main product features) ── */
-  const featureItems = [
+  const pillLabel = (text, featureKey) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>
+      {text}{pill(featureKey)}
+    </span>
+  );
+
+  /* ── Sidebar menu structure ── */
+  const menuItems = [
     { key: '/dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
   ];
 
-  /* ── SEO Tools section ── */
   const seoToolItems = [
-    { key: '/audit',       icon: <SearchOutlined />,  label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Listing Audit{usagePill('listing_audit')}</span> },
-    { key: '/history',     icon: <HistoryOutlined />,  label: 'Analysis History' },
-    { key: '/keywords',    icon: <KeyOutlined />,     label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Keywords{usagePill('keyword_search')}</span> },
-    { key: '/competitors', icon: <TeamOutlined />,    label: <span style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%' }}>Competitors{usagePill('competitor_tracking')}</span> },
+    {
+      key: 'seo-keyword-group',
+      icon: <KeyOutlined />,
+      label: 'Keyword Tools',
+      children: [
+        { key: '/keywords',          icon: <SearchOutlined />,      label: pillLabel('Keyword Search', 'keyword_search') },
+        { key: '/keywords/deep',     icon: <BarChartOutlined />,    label: pillLabel('Deep Analyzer', 'keyword_deep_analysis') },
+        { key: '/keywords/bulk',     icon: <OrderedListOutlined />, label: pillLabel('Bulk Rank Checker', 'bulk_rank_check') },
+        { key: '/keywords/tags',     icon: <TagsOutlined />,        label: pillLabel('Tag Analyzer', 'tag_analysis') },
+      ],
+    },
+    {
+      key: 'seo-listing-group',
+      icon: <FileSearchOutlined />,
+      label: 'Listing Management',
+      children: [
+        { key: '/audit',             icon: <AuditOutlined />,       label: pillLabel('Listing Audit', 'listing_audit') },
+        { key: '/history',           icon: <HistoryOutlined />,     label: 'Analysis History' },
+        { key: '/listings/active',   icon: <OrderedListOutlined />, label: pillLabel('Active Listings', 'active_listings') },
+      ],
+    },
+    {
+      key: 'seo-competitor-group',
+      icon: <TeamOutlined />,
+      label: 'Competitors',
+      children: [
+        { key: '/competitors',       icon: <ShopOutlined />,        label: pillLabel('Shop Tracker', 'competitor_tracking') },
+        { key: '/competitors/sales', icon: <LineChartOutlined />,   label: pillLabel('Sales Tracker', 'competitor_sales') },
+      ],
+    },
+    {
+      key: 'seo-ops-group',
+      icon: <TruckOutlined />,
+      label: 'Operations',
+      children: [
+        { key: '/delivery',          icon: <TruckOutlined />,       label: 'Delivery Status' },
+        { key: '/sales-map',         icon: <EnvironmentOutlined />, label: 'Sales Map' },
+      ],
+    },
   ];
 
-  /* ── Account menu (bottom section — user/account related) ── */
   const accountItems = [
     { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
   ];
@@ -79,6 +122,18 @@ const AppLayout = ({ children }) => {
     { type: 'divider' },
     { key: 'logout',   icon: <LogoutOutlined style={{ color: '#ff4d4f' }} />, label: <span style={{ color: '#ff4d4f' }}>Logout</span>, onClick: handleLogout },
   ];
+
+  /* ── Compute open keys from current path ── */
+  const getOpenKeys = () => {
+    const p = location.pathname;
+    if (p.startsWith('/keywords')) return ['seo-keyword-group'];
+    if (p.startsWith('/audit') || p.startsWith('/history') || p.startsWith('/listings')) return ['seo-listing-group'];
+    if (p.startsWith('/competitors')) return ['seo-competitor-group'];
+    if (p.startsWith('/delivery') || p.startsWith('/sales-map')) return ['seo-ops-group'];
+    return [];
+  };
+
+  const [openKeys, setOpenKeys] = useState(getOpenKeys);
 
   const siderStyle = {
     background:    isDark ? '#1a1a2e' : '#fff',
@@ -201,7 +256,7 @@ const AppLayout = ({ children }) => {
           <Menu
             mode="inline"
             selectedKeys={[location.pathname]}
-            items={featureItems}
+            items={menuItems}
             onClick={({ key }) => navigate(key)}
             style={{ background: 'transparent', border: 'none', fontSize: 14 }}
             theme={isDark ? 'dark' : 'light'}
@@ -211,8 +266,10 @@ const AppLayout = ({ children }) => {
           <Menu
             mode="inline"
             selectedKeys={[location.pathname]}
+            openKeys={collapsed ? [] : openKeys}
+            onOpenChange={(keys) => setOpenKeys(keys)}
             items={seoToolItems}
-            onClick={({ key }) => navigate(key)}
+            onClick={({ key }) => { if (!key.startsWith('seo-')) navigate(key); }}
             style={{ background: 'transparent', border: 'none', fontSize: 14 }}
             theme={isDark ? 'dark' : 'light'}
           />

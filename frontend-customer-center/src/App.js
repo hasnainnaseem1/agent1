@@ -22,6 +22,13 @@ import AnalysisDetailPage from './pages/AnalysisDetailPage';
 import HistoryPage from './pages/HistoryPage';
 import KeywordResearchPage from './pages/KeywordResearchPage';
 import CompetitorTrackerPage from './pages/CompetitorTrackerPage';
+import DeepKeywordAnalyzerPage from './pages/DeepKeywordAnalyzerPage';
+import BulkRankCheckerPage from './pages/BulkRankCheckerPage';
+import TagAnalyzerPage from './pages/TagAnalyzerPage';
+import ActiveListingsPage from './pages/ActiveListingsPage';
+import CompetitorSalesPage from './pages/CompetitorSalesPage';
+import DeliveryStatusPage from './pages/DeliveryStatusPage';
+import SalesMapPage from './pages/SalesMapPage';
 import { PermissionsProvider } from './context/PermissionsContext';
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
@@ -119,7 +126,14 @@ const AppWithTheme = () => {
           <Route path="/history"      element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
           <Route path="/history/:id"  element={<ProtectedRoute><AnalysisDetailPage /></ProtectedRoute>} />
           <Route path="/keywords"     element={<ProtectedRoute><KeywordResearchPage /></ProtectedRoute>} />
+          <Route path="/keywords/deep" element={<ProtectedRoute><DeepKeywordAnalyzerPage /></ProtectedRoute>} />
+          <Route path="/keywords/bulk" element={<ProtectedRoute><BulkRankCheckerPage /></ProtectedRoute>} />
+          <Route path="/keywords/tags" element={<ProtectedRoute><TagAnalyzerPage /></ProtectedRoute>} />
           <Route path="/competitors"  element={<ProtectedRoute><CompetitorTrackerPage /></ProtectedRoute>} />
+          <Route path="/competitors/sales" element={<ProtectedRoute><CompetitorSalesPage /></ProtectedRoute>} />
+          <Route path="/listings/active" element={<ProtectedRoute><ActiveListingsPage /></ProtectedRoute>} />
+          <Route path="/delivery"     element={<ProtectedRoute><DeliveryStatusPage /></ProtectedRoute>} />
+          <Route path="/sales-map"    element={<ProtectedRoute><SalesMapPage /></ProtectedRoute>} />
 
           {/* Legacy redirects → Settings tabs */}
           <Route path="/profile"       element={<Navigate to="/settings?tab=profile" replace />} />
