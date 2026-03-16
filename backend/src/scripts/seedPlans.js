@@ -165,6 +165,20 @@ async function seed() {
   await mongoose.connect(dbUri);
   console.log('📦 Connected to MongoDB');
 
+  // 0. Cleanup — remove stale features and plans NOT part of Phase 2
+  const validFeatureKeys = FEATURES.map(f => f.featureKey);
+  const validPlanNames = PLANS.map(p => p.name);
+
+  const deletedFeatures = await Feature.deleteMany({ featureKey: { $nin: validFeatureKeys } });
+  if (deletedFeatures.deletedCount > 0) {
+    console.log(`🧹 Removed ${deletedFeatures.deletedCount} stale feature(s) from DB`);
+  }
+
+  const deletedPlans = await Plan.deleteMany({ name: { $nin: validPlanNames } });
+  if (deletedPlans.deletedCount > 0) {
+    console.log(`🧹 Removed ${deletedPlans.deletedCount} stale plan(s) from DB`);
+  }
+
   // 1. Upsert all features
   const featureIdMap = {}; // featureKey → _id
   for (const def of FEATURES) {

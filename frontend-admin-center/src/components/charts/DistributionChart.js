@@ -8,13 +8,6 @@ try {
   Pie = null;
 }
 
-const PLAN_COLORS_MAP = {
-  Free: '#8c8c8c',
-  Starter: '#3B82F6',
-  Pro: '#7C3AED',
-  Unlimited: '#F59E0B',
-};
-
 const DistributionChart = ({ data = [], loading = false }) => {
   if (!Pie) {
     return (

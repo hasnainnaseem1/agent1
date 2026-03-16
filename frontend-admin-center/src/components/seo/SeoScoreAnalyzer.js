@@ -5,7 +5,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 /**
  * SeoScoreAnalyzer — Real-time SEO content audit panel.

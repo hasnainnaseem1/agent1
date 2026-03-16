@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Input, Button, Table, Tag, Typography, Row, Col,
-  Space, Empty, Statistic, message, theme, Spin,
+  Space, Empty, Statistic, message, theme,
 } from 'antd';
 import {
   PlusOutlined, ShopOutlined, TrophyOutlined,
@@ -27,7 +27,7 @@ const CompetitorTrackerPage = () => {
   const [shopUrl, setShopUrl] = useState('');
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(true);
+  const [, setFetchLoading] = useState(true);
 
   const card = {
     borderRadius: radii.lg,

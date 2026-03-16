@@ -7,9 +7,8 @@ import {
   GlobalOutlined, FileSearchOutlined, LinkOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/common/PageHeader';
-import seoApi from '../../api/seoApi';
 
-const { Text, Title, Paragraph } = Typography;
+const { Text, Paragraph } = Typography;
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 const MARKETING_URL = process.env.REACT_APP_MARKETING_URL || 'http://localhost:3000';

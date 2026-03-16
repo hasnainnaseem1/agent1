@@ -15,7 +15,7 @@ import usersApi from '../../api/usersApi';
 import departmentsApi from '../../api/departmentsApi';
 import rolesApi from '../../api/rolesApi';
 import { PERMISSIONS } from '../../utils/permissions';
-import { ROLES, STATUS, DEFAULT_PAGE_SIZE } from '../../utils/constants';
+import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
 import { formatDateTime } from '../../utils/helpers';
 
 const UsersListPage = () => {
@@ -59,6 +59,7 @@ const UsersListPage = () => {
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.current, pagination.pageSize, filters]);
 
   useEffect(() => {

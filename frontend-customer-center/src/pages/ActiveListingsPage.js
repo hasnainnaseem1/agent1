@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Typography, Tag, Progress, Row, Col, Statistic,
+  Card, Table, Typography, Tag, Row, Col, Statistic,
   Button, theme, Input, message, Empty, Spin,
 } from 'antd';
 import {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tabs, Card, Form, Input, Button, Switch, message, InputNumber, Select, ColorPicker, Space } from 'antd';
+import { Tabs, Card, Form, Input, Button, Switch, message, InputNumber, Select } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import PageHeader from '../components/common/PageHeader';
 import PermissionGuard from '../components/guards/PermissionGuard';
@@ -12,7 +12,7 @@ const SettingsPage = () => {
   const { hasPermission, isSuperAdmin } = usePermission();
   const [loading, setLoading] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
-  const [settings, setSettings] = useState({});
+  const [, setSettings] = useState({});
   const [customerForm] = Form.useForm();
   const [securityForm] = Form.useForm();
   const [notificationForm] = Form.useForm();

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Card, Button, Tag, Space, Typography, Badge, Input,
-  Select, Tooltip, Modal, message, Empty, Dropdown
+  Tooltip, Modal, message, Empty
 } from 'antd';
 import {
   BellOutlined, CheckOutlined, DeleteOutlined, ReloadOutlined,
   SearchOutlined, FilterOutlined, ExclamationCircleOutlined,
-  CheckCircleOutlined, InfoCircleOutlined, WarningOutlined,
+  InfoCircleOutlined, WarningOutlined,
   EyeOutlined
 } from '@ant-design/icons';
 import notificationsApi from '../../api/notificationsApi';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Card, Form, Input, Button, Typography, Avatar, Row, Col, Divider,
-  Space, message, Tag, Descriptions, Select, Upload, Spin
+  Card, Form, Input, Button, Typography, Avatar, Row, Col,
+  Space, message, Tag, Select, Spin
 } from 'antd';
 import {
   UserOutlined, MailOutlined, LockOutlined, SaveOutlined,
@@ -99,6 +99,7 @@ const ProfilePage = () => {
 
   useEffect(() => {
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfile = async () => {

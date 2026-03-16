@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Table, Input, Select, Button, Space, Card, message, Tooltip, Row, Col, Statistic, DatePicker,
+  Table, Input, Select, Button, Space, Card, message, Row, Col, Statistic,
   Modal, Form, InputNumber,
 } from 'antd';
 import {
@@ -12,7 +12,7 @@ import DateTimeRangePicker from '../../components/common/DateTimeRangePicker';
 import PermissionGuard from '../../components/guards/PermissionGuard';
 import logsApi from '../../api/logsApi';
 import { PERMISSIONS } from '../../utils/permissions';
-import { DEFAULT_PAGE_SIZE, ACTION_TYPES } from '../../utils/constants';
+import { ACTION_TYPES } from '../../utils/constants';
 import { formatDateTime, downloadBlob } from '../../utils/helpers';
 import dayjs from 'dayjs';
 
@@ -28,7 +28,6 @@ const LogsListPage = () => {
   const [deleteByDateModalOpen, setDeleteByDateModalOpen] = useState(false);
   const [deleteByDateLoading, setDeleteByDateLoading] = useState(false);
   const [deleteByDateForm] = Form.useForm();
-  const [userOptions, setUserOptions] = useState([]);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -56,6 +55,7 @@ const LogsListPage = () => {
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.current, pagination.pageSize, filters]);
 
   useEffect(() => {

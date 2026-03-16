@@ -5,7 +5,7 @@ import {
 import {
   PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined,
   CheckCircleOutlined, StopOutlined, StarOutlined, StarFilled,
-  SearchOutlined, TeamOutlined, DollarOutlined, AppstoreOutlined,
+  SearchOutlined, TeamOutlined, AppstoreOutlined,
   ClearOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';

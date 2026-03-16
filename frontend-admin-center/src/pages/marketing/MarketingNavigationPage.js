@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Button, Switch, InputNumber, Input, message, Space, Tag, Empty,
+  Card, Table, Button, Switch, InputNumber, message, Space, Tag, Empty,
 } from 'antd';
 import {
   SaveOutlined, ReloadOutlined, MenuOutlined,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Button, Space, Spin, message, Tag, Timeline, Popconfirm, Modal, Upload, Tabs,
-  Drawer, Form, Input, Select, Row, Col, Result, Avatar, Typography, Divider, Statistic, Tooltip,
+  Drawer, Form, Input, Select, Row, Col, Result, Avatar, Typography, Statistic, Tooltip,
 } from 'antd';
 import {
   ArrowLeftOutlined, EditOutlined, StopOutlined, CheckCircleOutlined, DeleteOutlined,
@@ -45,7 +45,7 @@ const UserDetailPage = () => {
   const [uploadMethod, setUploadMethod] = useState('url');
   const [fileList, setFileList] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [resetPasswordModalOpen, setResetPasswordModalOpen] = useState(false);
+  const [, setResetPasswordModalOpen] = useState(false);
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
 
   const fetchUser = useCallback(async () => {

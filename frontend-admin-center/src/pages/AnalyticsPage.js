@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Row, Col, Segmented, message, Card, Table, Tag, Empty, Statistic, Typography,
-  Avatar, Timeline, Tooltip, Badge, Tabs, Space, Button, Progress, List, Descriptions,
+  Avatar, Timeline, Tooltip, Badge, Tabs, Space, Button, Progress, Descriptions,
 } from 'antd';
 import {
   ThunderboltOutlined, ApiOutlined, TeamOutlined, UserOutlined,
@@ -20,7 +20,7 @@ import { usePermission } from '../hooks/usePermission';
 import analyticsApi from '../api/analyticsApi';
 import { formatNumber } from '../utils/helpers';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 // ─── Dynamic chart imports ───
 let Line, Pie, Column;
@@ -102,7 +102,7 @@ const AnalyticsPage = () => {
   const [advancedRevenue, setAdvancedRevenue] = useState(null);
 
   const navigate = useNavigate();
-  const { hasPermission } = usePermission();
+  usePermission();
 
   // RBAC
   const getCurrentUserRole = () => {

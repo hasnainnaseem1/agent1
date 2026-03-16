@@ -25,7 +25,7 @@ const AppHeader = ({ collapsed, setCollapsed }) => {
   const navigate = useNavigate();
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [timezoneModalOpen, setTimezoneModalOpen] = useState(false);
-  const [requestResetLoading, setRequestResetLoading] = useState(false);
+  const [, setRequestResetLoading] = useState(false);
   const {
     token: { colorBgContainer },
   } = theme.useToken();

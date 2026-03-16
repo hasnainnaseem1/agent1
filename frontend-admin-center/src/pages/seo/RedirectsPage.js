@@ -13,7 +13,7 @@ import { usePermission } from '../../hooks/usePermission';
 import seoApi from '../../api/seoApi';
 import { PERMISSIONS } from '../../utils/permissions';
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 const { Option } = Select;
 
 const statusCodeColors = {
@@ -231,7 +231,6 @@ const RedirectsPage = () => {
   ];
 
   // Summary stats
-  const totalRedirects = redirects.length;
   const activeRedirects = redirects.filter(r => r.isActive).length;
   const totalHits = redirects.reduce((sum, r) => sum + (r.hitCount || 0), 0);
 

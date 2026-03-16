@@ -29,7 +29,7 @@ const CustomerDetailPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [customer, setCustomer] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
+  const [, setAnalytics] = useState(null);
   const [allActivity, setAllActivity] = useState([]);
   const [activity, setActivity] = useState([]);
   const [activityDateRange, setActivityDateRange] = useState(null);

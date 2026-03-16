@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Badge, Dropdown, Button, Empty, message, Space, Tag, Popconfirm } from 'antd';
+import { Badge, Dropdown, Button, Empty, message, Tag, Popconfirm } from 'antd';
 import { BellOutlined, CheckOutlined, DeleteOutlined } from '@ant-design/icons';
 import notificationsApi from '../../api/notificationsApi';
 import { timeAgo } from '../../utils/helpers';
 import './NotificationsDropdown.css';
 
 const NotificationsDropdown = () => {
-  const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -10,7 +10,6 @@ import {
   Empty,
   Spin,
   Tag,
-  Tooltip,
   Divider,
   Upload,
   Row,

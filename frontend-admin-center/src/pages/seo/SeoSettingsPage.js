@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Card, Form, Input, Button, Switch, message, Row, Col, Divider, Typography, Alert, Space, Upload,
+  Card, Form, Input, Button, Switch, message, Row, Col, Typography, Alert, Upload,
 } from 'antd';
 import {
-  SaveOutlined, GoogleOutlined, GlobalOutlined, ShareAltOutlined, UploadOutlined,
+  SaveOutlined, GoogleOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/common/PageHeader';
 import PermissionGuard from '../../components/guards/PermissionGuard';
@@ -13,7 +13,7 @@ import uploadApi from '../../api/uploadApi';
 import { PERMISSIONS } from '../../utils/permissions';
 
 const { TextArea } = Input;
-const { Text, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 const SeoSettingsPage = () => {
   const { hasPermission } = usePermission();
@@ -25,6 +25,7 @@ const SeoSettingsPage = () => {
 
   useEffect(() => {
     fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchSettings = async () => {

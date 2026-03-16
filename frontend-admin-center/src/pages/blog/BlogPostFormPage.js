@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card, Form, Input, Button, Select, Switch, message,
-  Space, Typography, Row, Col, Divider, Tag, Upload
+  Space, Typography, Row, Col, Tag, Upload
 } from 'antd';
-import { ArrowLeftOutlined, SaveOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import blogApi from '../../api/blogApi';
 import uploadApi from '../../api/uploadApi';
@@ -27,6 +27,7 @@ const BlogPostFormPage = () => {
   useEffect(() => {
     fetchCategories();
     if (isEdit) fetchPost();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchPost = async () => {

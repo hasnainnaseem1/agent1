@@ -23,7 +23,7 @@ const BRAND = '#6C63FF';
 /* ═══════════════════════════ Stripe Tab ═══════════════════════════ */
 const StripeTab = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentSettings, setCurrentSettings] = useState(null);
 
@@ -153,7 +153,7 @@ const StripeTab = () => {
 /* ═══════════════════════════ Email Tab ═══════════════════════════ */
 const EmailTab = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testEmail, setTestEmail] = useState('');
@@ -892,7 +892,7 @@ const CronJobsTab = () => {
 /* ═══════════════════════════ Google SSO Tab ═══════════════════════════ */
 const GoogleSSOTab = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [enabled, setEnabled] = useState(false);
 
@@ -988,7 +988,7 @@ const TEMPLATE_LABELS = {
 };
 
 const EmailTemplatesTab = () => {
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -1303,7 +1303,7 @@ const EmailTemplatesTab = () => {
 /* ═══════════════════════════ LemonSqueezy Tab ═══════════════════════════ */
 const LemonSqueezyTab = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [currentSettings, setCurrentSettings] = useState(null);
   const [activeGateway, setActiveGateway] = useState('stripe');

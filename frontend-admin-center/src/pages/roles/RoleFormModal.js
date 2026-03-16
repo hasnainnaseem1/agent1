@@ -77,6 +77,7 @@ const RoleFormModal = ({ open, onClose, editingRole, availablePermissions }) => 
   const PermissionGroupCard = ({ groupName, groupPerms }) => {
     const meta = GROUP_META[groupName] || { icon: <AppstoreOutlined />, color: '#6C63FF' };
     const currentPerms = Form.useWatch('permissions', form) || [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     const selectedCount = useMemo(
       () => groupPerms.filter((p) => currentPerms.includes(p)).length,
       [groupPerms, currentPerms]

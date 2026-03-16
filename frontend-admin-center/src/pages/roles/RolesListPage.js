@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Table, Button, Space, Tag, message, Popconfirm, Tooltip, Row, Col, Descriptions, Badge, Alert,
+  Card, Table, Button, Space, Tag, message, Popconfirm, Tooltip, Row, Col, Badge, Alert,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, SafetyOutlined,
