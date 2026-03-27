@@ -223,7 +223,7 @@ const getListings = async (req, res) => {
       success: true,
       data: {
         listings: listings.map(l => ({
-          listingId: l.listingId,
+          listingId: l.etsyListingId,
           title: l.title,
           state: l.state,
           price: l.price,
@@ -231,7 +231,7 @@ const getListings = async (req, res) => {
           favorites: l.numFavorers,
           tags: l.tags,
           images: l.images,
-          url: l.url,
+          url: `https://www.etsy.com/listing/${l.etsyListingId}`,
           createdAt: l.originalCreatedAt,
           updatedAt: l.updatedAt,
         })),

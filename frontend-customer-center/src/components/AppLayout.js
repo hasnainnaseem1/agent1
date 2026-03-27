@@ -448,6 +448,29 @@ const AppLayout = ({ children }) => {
           )}
           {children}
         </Content>
+
+        {/* ── Legal Footer — Etsy API TOS §1 & §2 compliance ── */}
+        <div style={{
+          textAlign: 'center',
+          padding: '12px 24px 16px',
+          borderTop: `1px solid ${isDark ? '#2e2e4a' : '#f0f0f5'}`,
+        }}>
+          <div style={{ marginBottom: 4 }}>
+            <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/privacy` : '/privacy'}
+              target="_blank" rel="noreferrer"
+              style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
+            <a href={siteConfig?.marketingUrl ? `${siteConfig.marketingUrl}/terms` : '/terms'}
+              target="_blank" rel="noreferrer"
+              style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
+            {siteConfig?.contactEmail && (
+              <a href={`mailto:${siteConfig.contactEmail}`}
+                style={{ color: isDark ? '#6a6a8a' : '#aaa', fontSize: 11, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
+            )}
+          </div>
+          <Text style={{ fontSize: 10, color: isDark ? '#444460' : '#ccc' }}>
+            &copy; {new Date().getFullYear()} {siteConfig?.siteName || 'Sellsera'}. All rights reserved.
+          </Text>
+        </div>
       </Layout>
 
       {/* Command Bar Modal */}

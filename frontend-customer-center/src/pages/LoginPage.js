@@ -285,6 +285,26 @@ const LoginPage = () => {
         </div>
 
       </div>
+
+      {/* Legal footer — Etsy API TOS §1 & §2 compliance */}
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0,
+        textAlign: 'center', padding: '16px 24px',
+      }}>
+        <div style={{ marginBottom: 6 }}>
+          <a href={`${config.marketingUrl}/privacy`} target="_blank" rel="noreferrer"
+            style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Privacy Policy</a>
+          <a href={`${config.marketingUrl}/terms`} target="_blank" rel="noreferrer"
+            style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, marginRight: 16, textDecoration: 'none' }}>Terms of Service</a>
+          {siteConfig?.contactEmail && (
+            <a href={`mailto:${siteConfig.contactEmail}`}
+              style={{ color: isDark ? '#8888a8' : '#999', fontSize: 12, textDecoration: 'none' }}>{siteConfig.contactEmail}</a>
+          )}
+        </div>
+        <Text style={{ fontSize: 10, color: isDark ? '#555570' : '#bbb' }}>
+          The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
+        </Text>
+      </div>
     </div>
   );
 };

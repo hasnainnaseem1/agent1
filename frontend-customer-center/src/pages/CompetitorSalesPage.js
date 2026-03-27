@@ -95,7 +95,13 @@ const CompetitorSalesPage = () => {
       render: (t) => (
         <Space>
           <ShopOutlined style={{ color: BRAND }} />
-          <Text strong style={{ fontSize: 13 }}>{t}</Text>
+          <a
+            href={`https://www.etsy.com/shop/${encodeURIComponent(t)}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ fontWeight: 600, fontSize: 13, color: 'inherit' }}
+          >
+            {t}
+          </a>
         </Space>
       ),
     },

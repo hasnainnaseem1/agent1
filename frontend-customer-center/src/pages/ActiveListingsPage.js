@@ -6,7 +6,7 @@ import {
 import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
-  EyeOutlined,
+  EyeOutlined, ExportOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -42,6 +42,7 @@ const ActiveListingsPage = () => {
       const res = await etsyApi.getListings({ search: search || undefined });
       const rows = (res.data?.listings || []).map((l, i) => ({
         key: l.listingId || i,
+        listingId: l.listingId,
         title: l.title || 'Untitled',
         views: l.views || 0,
         favorites: l.favorites || 0,
@@ -109,6 +110,18 @@ const ActiveListingsPage = () => {
           {s}
         </Tag>
       ),
+    },
+    {
+      title: '', key: 'action', width: 110, align: 'center',
+      render: (_, record) => record.listingId ? (
+        <a
+          href={`https://www.etsy.com/listing/${record.listingId}`}
+          target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 12, color: BRAND, fontWeight: 500 }}
+        >
+          <ExportOutlined style={{ marginRight: 4 }} />View on Etsy
+        </a>
+      ) : null,
     },
   ];
 

@@ -94,7 +94,13 @@ const CompetitorTrackerPage = () => {
       render: (text) => (
         <Space>
           <ShopOutlined style={{ color: colors.brand }} />
-          <Text strong style={{ fontSize: 13 }}>{text}</Text>
+          <a
+            href={`https://www.etsy.com/shop/${encodeURIComponent(text)}`}
+            target="_blank" rel="noopener noreferrer"
+            style={{ fontWeight: 600, fontSize: 13, color: 'inherit' }}
+          >
+            {text}
+          </a>
         </Space>
       ),
     },
