@@ -15,6 +15,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
 import SuccessTracker from "../components/dashboard/SuccessTracker";
+import DashboardBanner from "../components/dashboard/DashboardBanner";
 import ConnectShopPrompt from "../components/ConnectShopPrompt";
 import SyncingState from "../components/SyncingState";
 import { useAuth } from "../context/AuthContext";
@@ -28,6 +29,19 @@ import etsyApi from "../api/etsyApi";
 
 const { Title, Text } = Typography;
 const BRAND = "#6C63FF";
+
+/* Pulse keyframe for active shop dot — injected once */
+if (typeof document !== 'undefined' && !document.getElementById('sellsera-pulse-style')) {
+  const style = document.createElement('style');
+  style.id = 'sellsera-pulse-style';
+  style.textContent = `
+    @keyframes sellseraPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.45); }
+      50%      { box-shadow: 0 0 0 4px rgba(16,185,129,0); }
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 const DashboardPage = () => {
   const { user, fetchMe, token } = useAuth();
@@ -223,22 +237,8 @@ const DashboardPage = () => {
       {/* Success Tracker — Onboarding Gamification */}
       <SuccessTracker />
 
-      {/* Welcome Banner — simplified */}
-      <Card
-        style={{
-          ...card,
-          background: `linear-gradient(135deg, ${BRAND} 0%, #A78BFA 100%)`,
-          marginBottom: 24,
-        }}
-        styles={{ body: { padding: "24px 28px" } }}
-      >
-        <Title level={3} style={{ color: "#fff", margin: 0 }}>
-          Welcome back, {user?.name?.split(" ")[0] || "there"}!
-        </Title>
-        <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, marginTop: 4, display: 'block' }}>
-          Here's an overview of your Etsy shop and tools.
-        </Text>
-      </Card>
+      {/* Dismissible Welcome Banner */}
+      <DashboardBanner />
 
       {/* ── Connected Shops Manager ────────────────────────────────── */}
       <div style={{ marginBottom: 24 }}>
@@ -298,19 +298,24 @@ const DashboardPage = () => {
                     display: 'flex', alignItems: 'center', gap: 14,
                     padding: '12px 20px',
                     cursor: 'pointer',
-                    transition: 'background 0.15s',
+                    transition: 'background 0.2s, border-color 0.2s',
                     borderBottom: idx < shops.length - 1 ? `1px solid ${isDark ? '#2e2e4a' : '#f0f0f5'}` : 'none',
+                    borderLeft: `3px solid ${isActive ? BRAND : 'transparent'}`,
                     background: isActive
-                      ? (isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)')
+                      ? (isDark ? 'rgba(108,99,255,0.10)' : 'rgba(108,99,255,0.05)')
                       : 'transparent',
                   }}
                   onMouseEnter={e => {
-                    if (!isActive) e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.015)';
+                    if (!isActive) {
+                      e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(108,99,255,0.025)';
+                      e.currentTarget.style.borderLeftColor = isDark ? '#4a4a6a' : '#c4b5fd';
+                    }
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.background = isActive
-                      ? (isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)')
+                      ? (isDark ? 'rgba(108,99,255,0.10)' : 'rgba(108,99,255,0.05)')
                       : 'transparent';
+                    e.currentTarget.style.borderLeftColor = isActive ? BRAND : 'transparent';
                   }}
                 >
                   {/* Avatar */}
@@ -338,6 +343,7 @@ const DashboardPage = () => {
                           <span style={{
                             width: 6, height: 6, borderRadius: '50%',
                             background: colors.success, display: 'inline-block',
+                            animation: 'sellseraPulse 2s ease-in-out infinite',
                           }} />
                           Active
                         </span>
