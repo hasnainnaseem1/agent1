@@ -20,6 +20,7 @@
  */
 
 const { UsageLog } = require('../../models/subscription');
+const { Plan } = require('../../models/subscription');
 const { EtsyShop } = require('../../models/integrations');
 
 /**
@@ -148,16 +149,28 @@ const getRemainingUsage = async (user) => {
   const enabledFeatures = planFeatures.filter((f) => f.enabled);
   const periodStart = getBillingPeriodStart(user);
 
+  // Fetch live plan for up-to-date limits
+  let livePlanFeatures = null;
+  const planId = user.planSnapshot?.planId;
+  if (planId) {
+    const livePlan = await Plan.findById(planId).select('features').lean();
+    livePlanFeatures = livePlan?.features || null;
+  }
+
   const results = [];
 
   for (const feature of enabledFeatures) {
+    // For any feature, prefer live plan limit over stale snapshot
+    const liveFeature = livePlanFeatures?.find(f => f.featureKey === feature.featureKey);
+    const liveLimit = liveFeature?.limit !== undefined ? liveFeature.limit : feature.limit;
+
     // Special handling for connect_shops — count actual EtsyShop records, not UsageLog
     if (feature.featureKey === 'connect_shops') {
       const shopCount = await EtsyShop.countDocuments({
         userId: user._id,
         status: { $ne: 'disconnected' },
       });
-      const limit = feature.limit;
+      const limit = liveLimit;
       const isUnlimited = limit === null || limit === undefined || limit === -1;
       results.push({
         featureKey: feature.featureKey,
@@ -171,7 +184,7 @@ const getRemainingUsage = async (user) => {
       continue;
     }
 
-    if (feature.limit === null || feature.limit === undefined) {
+    if (liveLimit === null || liveLimit === undefined) {
       results.push({
         featureKey: feature.featureKey,
         featureName: feature.featureName,
@@ -192,11 +205,11 @@ const getRemainingUsage = async (user) => {
       results.push({
         featureKey: feature.featureKey,
         featureName: feature.featureName,
-        limit: feature.limit,
+        limit: liveLimit,
         used,
-        remaining: Math.max(0, feature.limit - used),
+        remaining: Math.max(0, liveLimit - used),
         unlimited: false,
-        percentage: feature.limit > 0 ? Math.round((used / feature.limit) * 100) : 0,
+        percentage: liveLimit > 0 ? Math.round((used / liveLimit) * 100) : 0,
       });
     }
   }

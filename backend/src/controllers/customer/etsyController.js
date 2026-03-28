@@ -11,6 +11,7 @@
  */
 
 const { EtsyShop, EtsyListing, EtsyOAuthState } = require('../../models/integrations');
+const { Plan } = require('../../models/subscription');
 const oauthService = require('../../services/etsy/oauthService');
 const shopSyncService = require('../../services/etsy/shopSyncService');
 
@@ -113,10 +114,16 @@ const getShopInfo = async (req, res) => {
       .sort({ createdAt: 1 })
       .lean();
 
-    // Also get the plan's shop limit for quota info
-    const planFeatures = req.user?.planSnapshot?.features || [];
-    const shopLimitFeature = planFeatures.find(f => f.featureKey === 'connect_shops');
-    const shopLimit = shopLimitFeature?.enabled ? (shopLimitFeature.limit ?? 1) : 1;
+    // Get LIVE plan's shop limit (not stale planSnapshot)
+    let shopLimit = 1;
+    const planId = req.user?.planSnapshot?.planId;
+    if (planId) {
+      const livePlan = await Plan.findById(planId).select('features').lean();
+      const liveFeature = livePlan?.features?.find(f => f.featureKey === 'connect_shops');
+      if (liveFeature?.enabled) {
+        shopLimit = liveFeature.limit ?? -1;
+      }
+    }
 
     return res.json({
       success: true,

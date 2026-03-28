@@ -12,6 +12,7 @@
  */
 
 const { EtsyShop } = require('../../models/integrations');
+const { Plan } = require('../../models/subscription');
 
 const checkShopLimit = async (req, res, next) => {
   try {
@@ -29,12 +30,16 @@ const checkShopLimit = async (req, res, next) => {
       return next();
     }
 
-    // Find connect_shops in plan features
-    const planFeatures = user.planSnapshot?.features || [];
-    const feature = planFeatures.find(f => f.featureKey === 'connect_shops');
-
-    // Feature not in plan — default to 1 shop (free tier)
-    const limit = feature?.enabled ? (feature.limit ?? 1) : 1;
+    // Read LIVE plan limits (not stale planSnapshot)
+    let limit = 1;
+    const planId = user.planSnapshot?.planId;
+    if (planId) {
+      const livePlan = await Plan.findById(planId).select('features').lean();
+      const feature = livePlan?.features?.find(f => f.featureKey === 'connect_shops');
+      if (feature?.enabled) {
+        limit = feature.limit ?? -1;
+      }
+    }
 
     // If limit is -1 or null, it's unlimited
     if (limit === -1 || limit === null || limit === undefined) {
