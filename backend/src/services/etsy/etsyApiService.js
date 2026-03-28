@@ -114,7 +114,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     let response = await fetch(url, {
       method,
       headers: {
-        'x-api-key': key.apiKey,
+        'x-api-key': key.sharedSecret,
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
@@ -136,7 +136,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
       response = await fetch(url, {
         method,
         headers: {
-          'x-api-key': key.apiKey,
+          'x-api-key': key.sharedSecret,
           'Authorization': `Bearer ${refreshResult.accessToken}`,
           'Content-Type': 'application/json',
         },

@@ -171,12 +171,13 @@ const exchangeCodeForTokens = async (code, codeVerifier) => {
 const fetchShopInfo = async (accessToken) => {
   const config = await getEtsyConfig();
 
-  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Calling /users/me with x-api-key: ${config.clientId.substring(0, 8)}...`);
+  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Calling /users/me with x-api-key (shared secret): ${config.clientSecret.substring(0, 8)}...`);
 
   // First get the Etsy user ID
+  // Note: Etsy requires the Shared Secret (not Keystring) as x-api-key for authenticated calls
   const meResponse = await fetch('https://openapi.etsy.com/v3/application/users/me', {
     headers: {
-      'x-api-key': config.clientId,
+      'x-api-key': config.clientSecret,
       'Authorization': `Bearer ${accessToken}`,
     },
   });
@@ -193,7 +194,7 @@ const fetchShopInfo = async (accessToken) => {
   // Then get their shop
   const shopResponse = await fetch(`https://openapi.etsy.com/v3/application/users/${etsyUserId}/shops`, {
     headers: {
-      'x-api-key': config.clientId,
+      'x-api-key': config.clientSecret,
       'Authorization': `Bearer ${accessToken}`,
     },
   });
