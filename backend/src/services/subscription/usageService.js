@@ -20,6 +20,7 @@
  */
 
 const { UsageLog } = require('../../models/subscription');
+const { EtsyShop } = require('../../models/integrations');
 
 /**
  * Get the start of the current billing period for a user
@@ -150,6 +151,26 @@ const getRemainingUsage = async (user) => {
   const results = [];
 
   for (const feature of enabledFeatures) {
+    // Special handling for etsy_shop_limit — count actual EtsyShop records, not UsageLog
+    if (feature.featureKey === 'etsy_shop_limit') {
+      const shopCount = await EtsyShop.countDocuments({
+        userId: user._id,
+        status: { $ne: 'disconnected' },
+      });
+      const limit = feature.limit;
+      const isUnlimited = limit === null || limit === undefined || limit === -1;
+      results.push({
+        featureKey: feature.featureKey,
+        featureName: feature.featureName,
+        limit: isUnlimited ? null : limit,
+        used: shopCount,
+        remaining: isUnlimited ? null : Math.max(0, limit - shopCount),
+        unlimited: isUnlimited,
+        percentage: isUnlimited || !limit ? 0 : Math.round((shopCount / limit) * 100),
+      });
+      continue;
+    }
+
     if (feature.limit === null || feature.limit === undefined) {
       results.push({
         featureKey: feature.featureKey,

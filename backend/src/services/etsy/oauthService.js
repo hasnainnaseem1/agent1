@@ -248,18 +248,17 @@ const connectShop = async (userId, code, codeVerifier) => {
   // Fetch shop info using the new token
   const shopInfo = await fetchShopInfo(accessToken);
 
-  // Check if user already has a shop record (reconnection case)
-  let etsyShop = await EtsyShop.findOne({ userId });
+  // Check if this exact shop is already connected for this user (reconnection case)
+  let etsyShop = await EtsyShop.findOne({ userId, shopId: shopInfo.shopId });
 
   if (etsyShop) {
-    // Reconnecting — update with fresh tokens
+    // Reconnecting same shop — update with fresh tokens
     await etsyShop.reauthorize(
       encrypt(accessToken),
       encrypt(refreshToken),
       new Date(Date.now() + (expiresIn * 1000))
     );
     // Update shop metadata in case it changed
-    etsyShop.shopId = shopInfo.shopId;
     etsyShop.shopName = shopInfo.shopName;
     etsyShop.listingCount = shopInfo.listingCount;
     etsyShop.totalSales = shopInfo.totalSales;
@@ -270,7 +269,7 @@ const connectShop = async (userId, code, codeVerifier) => {
     };
     await etsyShop.save();
   } else {
-    // First-time connection
+    // New shop connection
     etsyShop = await EtsyShop.create({
       userId,
       shopId: shopInfo.shopId,

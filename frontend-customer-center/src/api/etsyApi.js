@@ -4,16 +4,16 @@ const etsyApi = {
   // Start OAuth flow — returns { authUrl }
   getAuthUrl:    () => axiosInstance.get('/api/v1/customer/etsy/auth').then(r => r.data),
 
-  // Get connected shop info
+  // Get all connected shops (multi-shop) — returns { shops[], shopCount, shopLimit }
   getShopInfo:   () => axiosInstance.get('/api/v1/customer/etsy/shop').then(r => r.data),
 
-  // Disconnect Etsy shop
-  disconnect:    () => axiosInstance.post('/api/v1/customer/etsy/disconnect').then(r => r.data),
+  // Disconnect a specific shop by its _id
+  disconnect:    (shopId) => axiosInstance.post(`/api/v1/customer/etsy/shop/${shopId}/disconnect`).then(r => r.data),
 
-  // Manually trigger listing sync
-  syncShop:      () => axiosInstance.post('/api/v1/customer/etsy/sync').then(r => r.data),
+  // Manually trigger listing sync for a specific shop
+  syncShop:      (shopId) => axiosInstance.post(`/api/v1/customer/etsy/shop/${shopId}/sync`).then(r => r.data),
 
-  // Synced listings
+  // Synced listings (optional shopId query param)
   getListings:   (params = {}) => axiosInstance.get('/api/v1/customer/etsy/listings', { params }).then(r => r.data),
 
   // Listing audit

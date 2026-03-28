@@ -100,26 +100,30 @@ const handleCallback = async (req, res) => {
 };
 
 /**
- * GET /api/v1/customer/etsy/shop
- * Returns the authenticated user's connected Etsy shop info.
+ * GET /api/v1/customer/etsy/shops
+ * Returns ALL connected Etsy shops for the authenticated user.
  */
 const getShopInfo = async (req, res) => {
   try {
-    const shop = await EtsyShop.findOne({ userId: req.userId })
-      .select('-accessToken_enc -refreshToken_enc');
+    const shops = await EtsyShop.find({
+      userId: req.userId,
+      status: { $ne: 'disconnected' },
+    })
+      .select('-accessToken_enc -refreshToken_enc')
+      .sort({ createdAt: 1 })
+      .lean();
 
-    if (!shop) {
-      return res.json({
-        success: true,
-        data: { connected: false },
-      });
-    }
+    // Also get the plan's shop limit for quota info
+    const planFeatures = req.user?.planSnapshot?.features || [];
+    const shopLimitFeature = planFeatures.find(f => f.featureKey === 'etsy_shop_limit');
+    const shopLimit = shopLimitFeature?.enabled ? (shopLimitFeature.limit ?? 1) : 1;
 
     return res.json({
       success: true,
       data: {
-        connected: true,
-        shop: {
+        connected: shops.length > 0,
+        shops: shops.map(shop => ({
+          id: shop._id,
           shopId: shop.shopId,
           shopName: shop.shopName,
           status: shop.status,
@@ -129,7 +133,10 @@ const getShopInfo = async (req, res) => {
           lastSyncAt: shop.lastSyncAt,
           tokenRevokedAt: shop.tokenRevokedAt,
           createdAt: shop.createdAt,
-        },
+        })),
+        shopCount: shops.length,
+        shopLimit: shopLimit === -1 ? null : shopLimit,
+        shopLimitUnlimited: shopLimit === -1 || shopLimit === null,
       },
     });
   } catch (error) {
@@ -142,17 +149,18 @@ const getShopInfo = async (req, res) => {
 };
 
 /**
- * POST /api/v1/customer/etsy/disconnect
- * Disconnects the user's Etsy shop (clears tokens, sets status to disconnected).
+ * POST /api/v1/customer/etsy/shop/:shopId/disconnect
+ * Disconnects a specific Etsy shop (clears tokens, sets status to disconnected).
  */
 const disconnectShop = async (req, res) => {
   try {
-    const shop = await EtsyShop.findOne({ userId: req.userId });
+    // checkShopConnection middleware validates ownership and attaches req.etsyShop
+    const shop = req.etsyShop;
 
     if (!shop) {
       return res.status(404).json({
         success: false,
-        message: 'No Etsy shop connected',
+        message: 'No Etsy shop found',
       });
     }
 
@@ -164,7 +172,7 @@ const disconnectShop = async (req, res) => {
 
     return res.json({
       success: true,
-      message: 'Etsy shop disconnected successfully',
+      message: `Etsy shop "${shop.shopName}" disconnected successfully`,
     });
   } catch (error) {
     console.error('Disconnect shop error:', error.message);

@@ -6,7 +6,7 @@ const etsyShopSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: [true, 'User ID is required'],
-    unique: true // 1 shop per user (MVP)
+    index: true
   },
 
   // Etsy identifiers
@@ -91,7 +91,8 @@ etsyShopSchema.pre('save', function (next) {
 });
 
 // Indexes
-etsyShopSchema.index({ userId: 1 }, { unique: true });
+etsyShopSchema.index({ userId: 1 });
+etsyShopSchema.index({ userId: 1, shopId: 1 }, { unique: true }); // Prevent same shop connected twice per user
 etsyShopSchema.index({ shopId: 1 });
 etsyShopSchema.index({ status: 1 });
 

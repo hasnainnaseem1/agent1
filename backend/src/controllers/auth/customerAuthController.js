@@ -231,9 +231,8 @@ const googleSSO = async (req, res) => {
     const ssoSecSettings = await getSecuritySettings();
     const token = generateToken(user._id, ssoSecSettings.sessionTimeout);
 
-    // Check if user has connected Etsy shop
-    const ssoEtsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
-    const ssoEtsyConnected = !!ssoEtsyShop && ssoEtsyShop.status !== 'disconnected';
+    // Count connected Etsy shops
+    const ssoEtsyShopCount = await EtsyShop.countDocuments({ userId: user._id, status: { $ne: 'disconnected' } });
 
     res.json({
       success: true,
@@ -249,7 +248,8 @@ const googleSSO = async (req, res) => {
         analysisCount: user.analysisCount,
         analysisLimit: user.analysisLimit,
         subscriptionStatus: user.subscriptionStatus,
-        etsyConnected: ssoEtsyConnected,
+        etsyConnected: ssoEtsyShopCount > 0,
+        etsyShopCount: ssoEtsyShopCount,
         isEmailVerified: user.isEmailVerified,
       },
     });
@@ -649,9 +649,8 @@ const login = async (req, res) => {
 
     const token = generateToken(user._id, secSettings.sessionTimeout);
 
-    // Check if user has connected Etsy shop
-    const loginEtsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
-    const loginEtsyConnected = !!loginEtsyShop && loginEtsyShop.status !== 'disconnected';
+    // Count connected Etsy shops
+    const loginEtsyShopCount = await EtsyShop.countDocuments({ userId: user._id, status: { $ne: 'disconnected' } });
 
     res.json({
       success: true,
@@ -671,7 +670,8 @@ const login = async (req, res) => {
         monthlyResetDate: user.monthlyResetDate,
         subscriptionStatus: user.subscriptionStatus,
         trialEndsAt: user.trialEndsAt || null,
-        etsyConnected: loginEtsyConnected,
+        etsyConnected: loginEtsyShopCount > 0,
+        etsyShopCount: loginEtsyShopCount,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
         lastLogin: user.lastLogin,
@@ -886,9 +886,8 @@ const getMe = async (req, res) => {
       });
     }
 
-    // Check if user has a connected Etsy shop
-    const etsyShop = await EtsyShop.findOne({ userId: user._id }).select('_id status').lean();
-    const etsyConnected = !!etsyShop && etsyShop.status !== 'disconnected';
+    // Count connected Etsy shops
+    const etsyShopCount = await EtsyShop.countDocuments({ userId: user._id, status: { $ne: 'disconnected' } });
 
     res.json({
       success: true,
@@ -909,7 +908,8 @@ const getMe = async (req, res) => {
         subscriptionExpiresAt: user.subscriptionExpiresAt || null,
         billingCycle: user.billingCycle || 'none',
         trialEndsAt: user.trialEndsAt || null,
-        etsyConnected,
+        etsyConnected: etsyShopCount > 0,
+        etsyShopCount,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
         lastLogin: user.lastLogin,

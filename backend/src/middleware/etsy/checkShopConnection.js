@@ -4,13 +4,19 @@
  * Verifies the authenticated user has a connected Etsy shop
  * with valid (non-revoked) tokens before proceeding.
  * 
+ * Supports multi-shop: if shopId is provided in params/query/body,
+ * validates that specific shop belongs to the user. Otherwise falls
+ * back to finding any active shop for the user.
+ * 
  * Returns appropriate error codes for frontend to show:
  * - SHOP_NOT_CONNECTED → ConnectShopPrompt
  * - SHOP_REQUIRES_REAUTH → amber re-auth banner
  * - SHOP_SYNCING → syncing state overlay
+ * - SHOP_NOT_FOUND → specific shop not found / not owned
  * 
  * Usage:
  *   router.get('/listings', auth, checkShopConnection, handler);
+ *   router.get('/shop/:shopId/listings', auth, checkShopConnection, handler);
  * 
  * Attaches to req:
  *   req.etsyShop = { _id, shopId, shopName, status, ... }
@@ -29,7 +35,29 @@ const checkShopConnection = async (req, res, next) => {
       });
     }
 
-    const shop = await EtsyShop.findOne({ userId });
+    // Check for shopId in params, query, or body (for multi-shop targeting)
+    const shopId = req.params.shopId || req.query.shopId || req.body?.shopId;
+
+    let shop;
+
+    if (shopId) {
+      // Target specific shop — validate ownership
+      shop = await EtsyShop.findOne({ _id: shopId, userId });
+
+      if (!shop) {
+        return res.status(404).json({
+          success: false,
+          code: 'SHOP_NOT_FOUND',
+          message: 'Shop not found or does not belong to your account',
+        });
+      }
+    } else {
+      // No specific shop — find any active shop for the user
+      shop = await EtsyShop.findOne({
+        userId,
+        status: { $nin: ['disconnected'] },
+      }).sort({ updatedAt: -1 });
+    }
 
     // No shop connected at all
     if (!shop) {
