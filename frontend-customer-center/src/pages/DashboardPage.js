@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import {
   Row, Col, Card, Statistic, Button, Typography,
-  Tag, Progress, theme, Alert, Space, List, Empty, message
+  Tag, Progress, theme, Alert, Space, List, Empty, message,
+  Modal, Tooltip, Spin,
 } from "antd";
 import {
   ThunderboltOutlined, RocketOutlined,
-  CrownOutlined, CalendarOutlined, CreditCardOutlined, ClockCircleOutlined,
-  ArrowRightOutlined, SyncOutlined, SearchOutlined, KeyOutlined,
+  ClockCircleOutlined,
+  SyncOutlined, SearchOutlined, KeyOutlined,
   TeamOutlined, HistoryOutlined, EyeOutlined, LockOutlined,
+  ShopOutlined, DisconnectOutlined, ExportOutlined,
+  CheckCircleOutlined, UnorderedListOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "../components/AppLayout";
@@ -33,11 +36,16 @@ const DashboardPage = () => {
   const { token: tok } = theme.useToken();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const analysisEnabled = siteConfig?.enableAnalysis !== false;
-  const subscriptionsEnabled = siteConfig?.enableSubscriptions !== false;
 
   const [recentAnalyses, setRecentAnalyses] = useState([]);
   const [shopSyncing, setShopSyncing] = useState(false);
+  const [shopInfo, setShopInfo] = useState(null);
+  const [shopLoading, setShopLoading] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const subStatus = user?.subscriptionStatus || "inactive";
+  const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null;
+  const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt - Date.now()) / 86400000)) : null;
 
   // Detect OAuth callback redirect — ?etsy_connected=true&shop=ShopName
   useEffect(() => {
@@ -47,9 +55,7 @@ const DashboardPage = () => {
       const shopName = searchParams.get('shop');
       message.success(`Etsy shop${shopName ? ` "${shopName}"` : ''} connected! Syncing your data...`);
       setShopSyncing(true);
-      // Refresh user state so etsyConnected flag is updated
       fetchMe(token);
-      // Clean URL params
       setSearchParams({}, { replace: true });
     } else if (etsyError) {
       const errorMessages = {
@@ -64,16 +70,20 @@ const DashboardPage = () => {
   // Determine if user has connected their shop
   const hasShop = !!user?.etsyConnected;
 
-  const usagePct = user ? Math.round((user.analysisCount / (user.analysisLimit || 1)) * 100) : 0;
-  const subStatus = user?.subscriptionStatus || "inactive";
-  const planName = user?.planSnapshot?.planName || user?.plan || "Free";
-  const billingCycle = user?.billingCycle || 'none';
-  const renewsAt = user?.subscriptionExpiresAt;
-  const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null;
-  const daysLeft = trialEndsAt ? Math.max(0, Math.ceil((trialEndsAt - Date.now()) / 86400000)) : null;
-  const isActive = subStatus === 'active';
-  const isCancelled = subStatus === 'cancelled';
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  // Fetch shop info when connected
+  useEffect(() => {
+    if (hasShop) {
+      setShopLoading(true);
+      etsyApi.getShopInfo()
+        .then(res => {
+          if (res.success && res.data?.connected) {
+            setShopInfo(res.data.shop);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setShopLoading(false));
+    }
+  }, [hasShop]);
 
   const card = {
     border: `1px solid ${isDark ? "#2e2e4a" : "#ebebf8"}`,
@@ -89,7 +99,30 @@ const DashboardPage = () => {
       .catch(() => {});
   }, []);
 
-
+  // Disconnect shop handler
+  const handleDisconnect = () => {
+    Modal.confirm({
+      title: 'Disconnect Etsy Shop',
+      content: `Are you sure you want to disconnect "${shopInfo?.shopName || 'your shop'}"? You can reconnect anytime.`,
+      okText: 'Disconnect',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setDisconnecting(true);
+        try {
+          const res = await etsyApi.disconnect();
+          if (res.success) {
+            message.success('Etsy shop disconnected');
+            setShopInfo(null);
+            fetchMe(token);
+          }
+        } catch {
+          message.error('Failed to disconnect shop');
+        } finally {
+          setDisconnecting(false);
+        }
+      },
+    });
+  };
 
   /* ── Command Center Cards ── */
   const commandCards = [
@@ -149,6 +182,8 @@ const DashboardPage = () => {
     );
   }
 
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+
   return (
     <AppLayout>
       {/* Trial / Expired Alert */}
@@ -174,7 +209,7 @@ const DashboardPage = () => {
       {/* Success Tracker — Onboarding Gamification */}
       <SuccessTracker />
 
-      {/* Welcome + Plan Banner */}
+      {/* Welcome Banner — simplified */}
       <Card
         style={{
           ...card,
@@ -183,131 +218,109 @@ const DashboardPage = () => {
         }}
         styles={{ body: { padding: "24px 28px" } }}
       >
-        <Row align="middle" gutter={[24, 16]}>
-          <Col xs={24} md={16}>
-            <Title level={3} style={{ color: "#fff", margin: 0 }}>
-              Welcome back, {user?.name?.split(" ")[0] || "there"}!
-            </Title>
-            <Space style={{ marginTop: 8 }} wrap>
-              <Tag color="rgba(255,255,255,0.25)" style={{ color: "#fff", border: "none", fontWeight: 600 }}>
-                <CrownOutlined /> {planName} Plan
-              </Tag>
-              <Tag
-                color={
-                  subStatus === "active" ? "green"
-                    : subStatus === "trial" ? "purple"
-                      : subStatus === "cancelled" ? "orange"
-                        : subStatus === "expired" ? "red"
-                          : "default"
-                }
-              >
-                {subStatus.replace("_", " ").toUpperCase()}
-              </Tag>
-              {billingCycle !== 'none' && (isActive || isCancelled) && (
-                <Tag color="rgba(255,255,255,0.25)" style={{ color: '#fff', border: 'none' }}>
-                  <CalendarOutlined /> {billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}
-                </Tag>
-              )}
-              {subStatus === "trial" && daysLeft !== null && (
-                <Text style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <CalendarOutlined /> {daysLeft} day{daysLeft !== 1 ? "s" : ""} left
-                </Text>
-              )}
-              {isActive && renewsAt && (
-                <Text style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <SyncOutlined /> Renews {formatDate(renewsAt)}
-                </Text>
-              )}
-              {isCancelled && renewsAt && (
-                <Text style={{ color: "rgba(255,255,255,0.85)" }}>
-                  <ClockCircleOutlined /> Ends {formatDate(renewsAt)}
-                </Text>
-              )}
-            </Space>
-          </Col>
-          <Col xs={24} md={8} style={{ textAlign: "right" }}>
-            <Space>
-              {subscriptionsEnabled && (
-                <Button ghost icon={<CrownOutlined />} onClick={() => navigate("/settings?tab=subscription")}>
-                  My Subscription
-                </Button>
-              )}
-              {subscriptionsEnabled && (
-                <Button
-                  type="default"
-                  icon={<ArrowRightOutlined />}
-                  onClick={() => navigate("/settings?tab=plans")}
-                  style={{ fontWeight: 600 }}
-                >
-                  {subStatus === "active" ? "Change Plan" : "Upgrade"}
-                </Button>
-              )}
-            </Space>
-          </Col>
-        </Row>
+        <Title level={3} style={{ color: "#fff", margin: 0 }}>
+          Welcome back, {user?.name?.split(" ")[0] || "there"}!
+        </Title>
+        <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 14, marginTop: 4, display: 'block' }}>
+          Here's an overview of your Etsy shop and tools.
+        </Text>
       </Card>
 
-      {/* Stats Row */}
-      <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
-        {analysisEnabled && (
-        <Col xs={24} sm={12} md={6}>
-          <Card style={card} styles={{ body: { padding: "20px 24px" } }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>Usage</Text>}
-              value={user?.analysisCount || 0}
-              suffix={<Text type="secondary">/ {user?.analysisLimit || 1}</Text>}
-              prefix={<ThunderboltOutlined style={{ color: BRAND }} />}
-              styles={{ content: { color: BRAND, fontWeight: 700 } }}
-            />
-            <Progress
-              percent={Math.min(usagePct, 100)}
-              showInfo={false}
-              strokeColor={usagePct >= 90 ? "#ff4d4f" : { from: BRAND, to: "#A78BFA" }}
-              size="small" style={{ marginTop: 8 }}
-            />
-          </Card>
-        </Col>
+      {/* Connected Shop Card */}
+      <Card
+        style={{ ...card, marginBottom: 24 }}
+        styles={{ body: { padding: 0 } }}
+      >
+        {shopLoading ? (
+          <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>
+        ) : shopInfo ? (
+          <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap' }}>
+            {/* Shop icon + name */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '20px 24px', flex: '1 1 auto', minWidth: 240,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14,
+                background: `linear-gradient(135deg, #F97316, #FB923C)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <ShopOutlined style={{ fontSize: 22, color: '#fff' }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Text strong style={{ fontSize: 16 }}>{shopInfo.shopName}</Text>
+                  <Tag
+                    icon={<CheckCircleOutlined />}
+                    color="success"
+                    style={{ borderRadius: 12, fontSize: 11, fontWeight: 600 }}
+                  >
+                    Connected
+                  </Tag>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Connected {formatDate(shopInfo.createdAt)}
+                  {shopInfo.lastSyncAt && <> · Last synced {formatDate(shopInfo.lastSyncAt)}</>}
+                </Text>
+              </div>
+            </div>
+
+            {/* Shop stats */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 32,
+              padding: '20px 24px',
+              borderLeft: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
+              flexShrink: 0,
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Listings</Text>
+                <Text strong style={{ fontSize: 18, color: BRAND }}>{shopInfo.listingCount ?? '—'}</Text>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Sales</Text>
+                <Text strong style={{ fontSize: 18, color: colors.success }}>{shopInfo.totalSales ?? '—'}</Text>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '20px 24px',
+              borderLeft: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
+              flexShrink: 0,
+            }}>
+              <Tooltip title="View listings">
+                <Button
+                  icon={<UnorderedListOutlined />}
+                  onClick={() => navigate('/listings/active')}
+                >
+                  Listings
+                </Button>
+              </Tooltip>
+              <Tooltip title="View on Etsy">
+                <Button
+                  icon={<ExportOutlined />}
+                  href={`https://www.etsy.com/shop/${shopInfo.shopName}`}
+                  target="_blank"
+                />
+              </Tooltip>
+              <Tooltip title="Disconnect shop">
+                <Button
+                  danger
+                  icon={<DisconnectOutlined />}
+                  loading={disconnecting}
+                  onClick={handleDisconnect}
+                />
+              </Tooltip>
+            </div>
+          </div>
+        ) : (
+          <div style={{ padding: '20px 24px', textAlign: 'center' }}>
+            <Text type="secondary">Unable to load shop info</Text>
+          </div>
         )}
-        {subscriptionsEnabled && (
-        <Col xs={24} sm={12} md={6}>
-          <Card style={card} styles={{ body: { padding: "20px 24px" } }} hoverable onClick={() => navigate("/settings?tab=subscription")}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>Current Plan</Text>}
-              value={planName}
-              prefix={<RocketOutlined style={{ color: "#52c41a" }} />}
-              styles={{ content: { color: "#52c41a", fontWeight: 700 } }}
-            />
-          </Card>
-        </Col>
-        )}
-        {subscriptionsEnabled && (
-        <Col xs={24} sm={12} md={6}>
-          <Card style={card} styles={{ body: { padding: "20px 24px" } }} hoverable onClick={() => navigate("/settings?tab=billing")}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>Billing</Text>}
-              value="View History"
-              prefix={<CreditCardOutlined style={{ color: "#faad14" }} />}
-              styles={{ content: { color: "#faad14", fontWeight: 700, fontSize: 14 } }}
-            />
-          </Card>
-        </Col>
-        )}
-        {analysisEnabled && (
-        <Col xs={24} sm={12} md={6}>
-          <Card style={card} styles={{ body: { padding: "20px 24px" } }}>
-            <Statistic
-              title={<Text type="secondary" style={{ fontSize: 13 }}>Next Reset</Text>}
-              value={user?.monthlyResetDate
-                ? new Date(user.monthlyResetDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
-                : "N/A"
-              }
-              prefix={<SyncOutlined style={{ color: "#722ed1" }} />}
-              styles={{ content: { color: "#722ed1", fontWeight: 700, fontSize: 16 } }}
-            />
-          </Card>
-        </Col>
-        )}
-      </Row>
+      </Card>
 
       {/* Command Center — Feature Action Cards */}
       <Title level={4} style={{ marginBottom: 16 }}>

@@ -181,7 +181,8 @@ const disconnectShop = async (req, res) => {
  */
 const getListings = async (req, res) => {
   try {
-    const shop = await EtsyShop.findOne({ userId: req.userId }).select('_id');
+    // Use shop from checkShopConnection middleware, or fallback to query
+    const shop = req.etsyShop || await EtsyShop.findOne({ userId: req.userId }).select('_id');
     if (!shop) {
       return res.json({ success: true, data: { listings: [], total: 0 } });
     }
@@ -210,7 +211,7 @@ const getListings = async (req, res) => {
           state: l.state,
           price: l.price,
           views: l.views,
-          favorites: l.numFavorers,
+          favorites: l.favorites,
           tags: l.tags,
           images: l.images,
           url: `https://www.etsy.com/listing/${l.etsyListingId}`,

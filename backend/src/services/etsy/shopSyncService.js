@@ -69,10 +69,10 @@ const syncListings = async (etsyShop) => {
             currencyCode: listing.price?.currency_code || 'USD',
             quantity: listing.quantity || 0,
             views: listing.views || 0,
-            numFavorers: listing.num_favorers || 0,
+            favorites: listing.num_favorers || 0,
             state: listing.state || 'active',
-            categoryId: listing.taxonomy_id ? String(listing.taxonomy_id) : null,
-            categoryPath: listing.category_path || [],
+            taxonomyId: listing.taxonomy_id || null,
+            taxonomyPath: listing.category_path || [],
             images: [], // Images fetched separately if needed
             shippingProfile: listing.shipping_profile_id ? String(listing.shipping_profile_id) : null,
             processingMin: listing.processing_min || null,
