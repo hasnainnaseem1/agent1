@@ -405,13 +405,13 @@ const AppLayout = ({ children }) => {
           {/* Etsy Required Trademark Disclosure — rendered once at app level */}
           <div style={{
             textAlign: 'center',
-            padding: '8px 16px',
+            padding: '10px 16px',
             marginBottom: 16,
             borderRadius: 8,
-            background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+            background: isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.05)',
+            border: `1px solid ${isDark ? 'rgba(108,99,255,0.2)' : 'rgba(108,99,255,0.15)'}`,
           }}>
-            <Text style={{ fontSize: 12, color: isDark ? '#8888a8' : '#888' }}>
+            <Text style={{ fontSize: 13, color: isDark ? '#a0a0c0' : '#666' }}>
               The term &ldquo;Etsy&rdquo; is a trademark of Etsy, Inc. This application uses the Etsy API but is not endorsed or certified by Etsy, Inc.
             </Text>
           </div>

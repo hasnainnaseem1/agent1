@@ -10,7 +10,7 @@
  *   POST /api/v1/customer/etsy/disconnect  → Disconnect shop
  */
 
-const { EtsyShop, EtsyListing } = require('../../models/integrations');
+const { EtsyShop, EtsyListing, EtsyOAuthState } = require('../../models/integrations');
 const oauthService = require('../../services/etsy/oauthService');
 const shopSyncService = require('../../services/etsy/shopSyncService');
 
@@ -22,11 +22,12 @@ const initiateAuth = async (req, res) => {
   try {
     const { authUrl, state, codeVerifier } = await oauthService.generateAuthUrl();
 
-    // Store state, code verifier, and userId in session for callback verification
-    // (callback arrives as browser redirect from Etsy — no JWT available)
-    req.session.etsyOAuthState = state;
-    req.session.etsyCodeVerifier = codeVerifier;
-    req.session.etsyUserId = req.userId.toString();
+    // Store state + PKCE verifier in DB (not session — cross-domain cookies are unreliable)
+    await EtsyOAuthState.create({
+      state,
+      codeVerifier,
+      userId: req.userId,
+    });
 
     return res.json({
       success: true,
@@ -63,37 +64,18 @@ const handleCallback = async (req, res) => {
       });
     }
 
-    // Validate state matches what we stored (CSRF protection)
-    const storedState = req.session?.etsyOAuthState;
-    const storedCodeVerifier = req.session?.etsyCodeVerifier;
+    // Look up OAuth state from DB (replaces session-based storage)
+    const oauthRecord = await EtsyOAuthState.findOneAndDelete({ state });
 
-    if (!storedState || state !== storedState) {
+    if (!oauthRecord) {
       return res.status(403).json({
         success: false,
         message: 'Invalid OAuth state — possible CSRF attempt',
       });
     }
 
-    if (!storedCodeVerifier) {
-      return res.status(400).json({
-        success: false,
-        message: 'OAuth session expired. Please try connecting again.',
-      });
-    }
-
-    // Retrieve userId from session (stored during initiateAuth)
-    const userId = req.session?.etsyUserId;
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'OAuth session expired. Please try connecting again.',
-      });
-    }
-
-    // Clear OAuth session data (one-time use)
-    delete req.session.etsyOAuthState;
-    delete req.session.etsyCodeVerifier;
-    delete req.session.etsyUserId;
+    const storedCodeVerifier = oauthRecord.codeVerifier;
+    const userId = oauthRecord.userId;
 
     // Exchange code for tokens and connect shop
     const etsyShop = await oauthService.connectShop(
