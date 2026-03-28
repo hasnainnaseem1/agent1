@@ -232,10 +232,45 @@ const getListings = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/v1/customer/etsy/sync
+ * Manually trigger a listing sync for the user's connected shop.
+ */
+const syncNow = async (req, res) => {
+  try {
+    const shop = req.etsyShop || await EtsyShop.findOne({ userId: req.userId });
+    if (!shop) {
+      return res.status(404).json({ success: false, message: 'No Etsy shop connected' });
+    }
+
+    const result = await shopSyncService.syncListings(shop);
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: `Synced ${result.syncedCount} listings`,
+        data: { syncedCount: result.syncedCount },
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: result.error || 'Sync failed',
+      });
+    }
+  } catch (error) {
+    console.error('Manual sync error:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to sync listings',
+    });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
   getShopInfo,
   getListings,
   disconnectShop,
+  syncNow,
 };

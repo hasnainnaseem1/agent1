@@ -42,6 +42,7 @@ const DashboardPage = () => {
   const [shopInfo, setShopInfo] = useState(null);
   const [shopLoading, setShopLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const subStatus = user?.subscriptionStatus || "inactive";
   const trialEndsAt = user?.trialEndsAt ? new Date(user.trialEndsAt) : null;
@@ -122,6 +123,28 @@ const DashboardPage = () => {
         }
       },
     });
+  };
+
+  // Manual sync handler
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const res = await etsyApi.syncShop();
+      if (res.success) {
+        message.success(res.message || 'Listings synced!');
+        // Refresh shop info to get updated listing count
+        const shopRes = await etsyApi.getShopInfo();
+        if (shopRes.success && shopRes.data?.connected) {
+          setShopInfo(shopRes.data.shop);
+        }
+      } else {
+        message.error(res.message || 'Sync failed');
+      }
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to sync listings');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   /* ── Command Center Cards ── */
@@ -290,6 +313,15 @@ const DashboardPage = () => {
               borderLeft: `1px solid ${isDark ? '#2e2e4a' : '#ebebf8'}`,
               flexShrink: 0,
             }}>
+              <Tooltip title="Sync listings from Etsy">
+                <Button
+                  icon={<SyncOutlined spin={syncing} />}
+                  loading={syncing}
+                  onClick={handleSync}
+                >
+                  Sync
+                </Button>
+              </Tooltip>
               <Tooltip title="View listings">
                 <Button
                   icon={<UnorderedListOutlined />}

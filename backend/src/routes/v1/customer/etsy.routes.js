@@ -28,4 +28,9 @@ router.get('/listings', checkShopConnection, etsyController.getListings);
 // @access  Private — requires shop connection
 router.post('/disconnect', checkShopConnection, etsyController.disconnectShop);
 
+// @route   POST /api/v1/customer/etsy/sync
+// @desc    Manually trigger listing sync
+// @access  Private — requires shop connection
+router.post('/sync', checkShopConnection, etsyController.syncNow);
+
 module.exports = router;

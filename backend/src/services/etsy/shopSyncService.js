@@ -38,6 +38,8 @@ const syncListings = async (etsyShop) => {
     let hasMore = true;
 
     while (hasMore) {
+      console.log(`[ShopSync] Fetching listings for shop ${etsyShop.shopId} (offset: ${offset})`);
+
       const result = await etsyApi.authenticatedRequest(
         etsyShop,
         'GET',
@@ -46,12 +48,16 @@ const syncListings = async (etsyShop) => {
       );
 
       if (!result.success) {
+        console.error(`[ShopSync] API call failed for shop ${etsyShop.shopId}:`, result.error, result.code);
         // If token was revoked during sync, stop
         if (result.code === 'SHOP_TOKEN_REVOKED') {
           return { success: false, syncedCount: totalSynced, error: 'Token revoked during sync' };
         }
         break;
       }
+
+      console.log(`[ShopSync] Got ${result.data?.results?.length || 0} listings (count: ${result.data?.count})`);
+
 
       const listings = result.data.results || [];
 

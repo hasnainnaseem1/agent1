@@ -10,6 +10,9 @@ const etsyApi = {
   // Disconnect Etsy shop
   disconnect:    () => axiosInstance.post('/api/v1/customer/etsy/disconnect').then(r => r.data),
 
+  // Manually trigger listing sync
+  syncShop:      () => axiosInstance.post('/api/v1/customer/etsy/sync').then(r => r.data),
+
   // Synced listings
   getListings:   (params = {}) => axiosInstance.get('/api/v1/customer/etsy/listings', { params }).then(r => r.data),
 

@@ -20,6 +20,7 @@
 const { EtsyShop } = require('../../models/integrations');
 const { getNextKey, handleRateLimit, handleKeyError } = require('./keyPoolService');
 const { encrypt, decrypt } = require('../../utils/encryption');
+const AdminSettings = require('../../models/admin/AdminSettings');
 
 const ETSY_API_BASE = 'https://openapi.etsy.com';
 
@@ -99,11 +100,26 @@ const publicRequest = async (method, path, options = {}) => {
  */
 const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
   let key;
+  let apiKeyHeader;
 
+  // Try key pool first, fall back to OAuth config from AdminSettings
   try {
     key = await getNextKey();
+    apiKeyHeader = `${key.apiKey}:${key.sharedSecret}`;
   } catch (err) {
-    return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
+    // Key pool empty — use the OAuth credentials from AdminSettings
+    try {
+      const settings = await AdminSettings.getSettings();
+      const etsy = settings?.etsySettings || {};
+      const clientId = etsy.clientId || process.env.ETSY_CLIENT_ID;
+      const clientSecret = etsy.clientSecret || process.env.ETSY_CLIENT_SECRET;
+      if (!clientId) {
+        return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
+      }
+      apiKeyHeader = `${clientId}:${clientSecret}`;
+    } catch {
+      return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
+    }
   }
 
   const accessToken = decrypt(etsyShop.accessToken_enc);
@@ -114,7 +130,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     let response = await fetch(url, {
       method,
       headers: {
-        'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
+        'x-api-key': apiKeyHeader,
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
@@ -123,7 +139,9 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
 
     // Token expired — attempt one refresh
     if (response.status === 401) {
-      const refreshResult = await attemptTokenRefresh(etsyShop, key.apiKey);
+      // Extract clientId from the apiKeyHeader for token refresh
+      const clientId = apiKeyHeader.split(':')[0];
+      const refreshResult = await attemptTokenRefresh(etsyShop, clientId);
 
       if (!refreshResult.success) {
         // Refresh failed — token revoked
@@ -136,7 +154,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
       response = await fetch(url, {
         method,
         headers: {
-          'x-api-key': `${key.apiKey}:${key.sharedSecret}`,
+          'x-api-key': apiKeyHeader,
           'Authorization': `Bearer ${refreshResult.accessToken}`,
           'Content-Type': 'application/json',
         },
@@ -153,19 +171,20 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     // Rate limited
     if (response.status === 429) {
       const retryAfter = parseInt(response.headers.get('retry-after') || '60', 10);
-      await handleRateLimit(key._id, retryAfter);
+      if (key) await handleRateLimit(key._id, retryAfter);
       return { success: false, error: 'Rate limited', code: 'RATE_LIMITED' };
     }
 
     // Server error
     if (response.status >= 500) {
-      await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
+      if (key) await handleKeyError(key._id, `Etsy ${response.status}: ${response.statusText}`);
       return { success: false, error: 'Etsy server error', code: 'ETSY_SERVER_ERROR' };
     }
 
     // Other client errors
     if (!response.ok) {
       const errorBody = await safeParseJson(response);
+      console.error(`[EtsyAPI] ${method} ${path} failed:`, response.status, errorBody?.error || response.statusText);
       return {
         success: false,
         error: errorBody?.error || response.statusText,
@@ -181,6 +200,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
     if (key) {
       await handleKeyError(key._id, err.message);
     }
+    console.error(`[EtsyAPI] ${method} ${path} network error:`, err.message);
     return { success: false, error: err.message, code: 'NETWORK_ERROR' };
   }
 };
