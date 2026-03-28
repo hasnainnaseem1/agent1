@@ -120,7 +120,7 @@ const AppLayout = ({ children }) => {
       children: [
         { key: '/audit',             icon: <AuditOutlined />,       label: pillLabel('Listing Audit', 'listing_audit') },
         { key: '/history',           icon: <HistoryOutlined />,     label: 'Analysis History' },
-        { key: '/listings/active',   icon: <OrderedListOutlined />, label: pillLabel('Active Listings', 'active_listings') },
+        { key: '/listings/active',   icon: <OrderedListOutlined />, label: pillLabel('Active Listings', 'listing_sync') },
       ],
     },
     {

@@ -40,7 +40,7 @@ const UsageQuotasPage = () => {
     keyword_deep_analysis:'Deep Analyses',
     bulk_rank_check:      'Bulk Rank Checks',
     tag_analysis:         'Tag Analyses',
-    active_listings:      'Active Listings',
+    listing_sync:         'Active Listings',
     competitor_tracking:  'Competitor Tracks',
     competitor_sales:     'Sales Trackers',
   };
