@@ -208,11 +208,18 @@ const fetchShopInfo = async (accessToken) => {
 
   const shopData = await shopResponse.json();
 
-  if (!shopData.results || shopData.results.length === 0) {
+  console.log(`[${new Date().toISOString()}] [EtsyOAuth] Shop response keys:`, Object.keys(shopData), 'results count:', shopData.results?.length, 'shop_id:', shopData.shop_id);
+
+  // Etsy may return the shop directly or wrapped in a results array
+  let shop;
+  if (shopData.results && shopData.results.length > 0) {
+    shop = shopData.results[0];
+  } else if (shopData.shop_id) {
+    shop = shopData;
+  } else {
+    console.error(`[${new Date().toISOString()}] [EtsyOAuth] Unexpected shop response:`, JSON.stringify(shopData).substring(0, 500));
     throw new Error('No Etsy shop found for this account');
   }
-
-  const shop = shopData.results[0];
 
   return {
     shopId: String(shop.shop_id),
