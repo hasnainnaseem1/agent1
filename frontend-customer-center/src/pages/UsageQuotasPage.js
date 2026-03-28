@@ -34,7 +34,7 @@ const UsageQuotasPage = () => {
 
   /* ── Build quota rows from permissions features ── */
   const featureLabels = {
-    etsy_shop_limit:      'Connected Shops',
+    connect_shops:        'Connected Shops',
     listing_audit:        'Listing Audits',
     keyword_search:       'Keyword Searches',
     keyword_deep_analysis:'Deep Analyses',

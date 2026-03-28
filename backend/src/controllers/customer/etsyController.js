@@ -115,7 +115,7 @@ const getShopInfo = async (req, res) => {
 
     // Also get the plan's shop limit for quota info
     const planFeatures = req.user?.planSnapshot?.features || [];
-    const shopLimitFeature = planFeatures.find(f => f.featureKey === 'etsy_shop_limit');
+    const shopLimitFeature = planFeatures.find(f => f.featureKey === 'connect_shops');
     const shopLimit = shopLimitFeature?.enabled ? (shopLimitFeature.limit ?? 1) : 1;
 
     return res.json({

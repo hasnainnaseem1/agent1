@@ -151,8 +151,8 @@ const getRemainingUsage = async (user) => {
   const results = [];
 
   for (const feature of enabledFeatures) {
-    // Special handling for etsy_shop_limit — count actual EtsyShop records, not UsageLog
-    if (feature.featureKey === 'etsy_shop_limit') {
+    // Special handling for connect_shops — count actual EtsyShop records, not UsageLog
+    if (feature.featureKey === 'connect_shops') {
       const shopCount = await EtsyShop.countDocuments({
         userId: user._id,
         status: { $ne: 'disconnected' },

@@ -1,8 +1,8 @@
 /**
  * checkShopLimit Middleware
  * 
- * Validates that the user hasn't exceeded their plan's etsy_shop_limit
- * before allowing a new shop connection.
+ * Validates that the user hasn't exceeded their plan's connect_shops
+ * limit before allowing a new shop connection.
  * 
  * Unlike checkFeatureAccess (which counts UsageLog entries), this middleware
  * counts actual EtsyShop records since shops are persistent resources.
@@ -29,9 +29,9 @@ const checkShopLimit = async (req, res, next) => {
       return next();
     }
 
-    // Find etsy_shop_limit in plan features
+    // Find connect_shops in plan features
     const planFeatures = user.planSnapshot?.features || [];
-    const feature = planFeatures.find(f => f.featureKey === 'etsy_shop_limit');
+    const feature = planFeatures.find(f => f.featureKey === 'connect_shops');
 
     // Feature not in plan — default to 1 shop (free tier)
     const limit = feature?.enabled ? (feature.limit ?? 1) : 1;
