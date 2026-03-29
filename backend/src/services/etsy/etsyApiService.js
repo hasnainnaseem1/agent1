@@ -55,10 +55,12 @@ const publicRequest = async (method, path, options = {}) => {
       const url = buildUrl(path, options.params);
       log.info(`publicRequest: ${method} ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
 
+      const apiKeyHeader = key.sharedSecret ? `${key.apiKey}:${key.sharedSecret}` : key.apiKey;
+
       const response = await fetch(url, {
         method,
         headers: {
-          'x-api-key': key.apiKey,
+          'x-api-key': apiKeyHeader,
           'Content-Type': 'application/json',
         },
         ...(options.body ? { body: JSON.stringify(options.body) } : {}),
@@ -145,7 +147,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
   // Try key pool first, fall back to OAuth config from AdminSettings
   try {
     key = await getNextKey();
-    apiKeyHeader = key.apiKey;
+    apiKeyHeader = key.sharedSecret ? `${key.apiKey}:${key.sharedSecret}` : key.apiKey;
     log.info(`authRequest: key acquired (label=${key.label})`);
   } catch (err) {
     log.warn('authRequest: key pool empty, falling back to AdminSettings -', err.message);
@@ -157,7 +159,8 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
         log.error('authRequest: NO API KEYS - pool empty AND no AdminSettings/env clientId');
         return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
       }
-      apiKeyHeader = clientId;
+      const clientSecret = etsy.clientSecret || process.env.ETSY_CLIENT_SECRET || '';
+      apiKeyHeader = clientSecret ? `${clientId}:${clientSecret}` : clientId;
       log.info('authRequest: using AdminSettings clientId as fallback');
     } catch {
       log.error('authRequest: NO API KEYS - pool empty AND AdminSettings query failed');
@@ -189,7 +192,8 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
       // Token expired — attempt one refresh (only on first attempt)
       if (response.status === 401 && attempt === 0) {
         log.warn(`authRequest: 401 on ${path} — attempting token refresh for shop ${etsyShop.shopId}`);
-        const clientId = apiKeyHeader;
+        // client_id for token refresh must be just the keystring, not keystring:secret
+        const clientId = key ? key.apiKey : (apiKeyHeader.split(':')[0]);
         const refreshResult = await attemptTokenRefresh(etsyShop, clientId);
 
         if (!refreshResult.success) {
