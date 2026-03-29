@@ -26,14 +26,21 @@ const log = require('../../utils/logger')('KeywordService');
  * Search Etsy for a keyword and return enriched results.
  * @param {string} keyword - The seed keyword
  * @param {number} limit - Number of listings to fetch (default 100)
+ * @param {Object} [options] - { country, offset }
  * @returns {{ success, listings, totalResults, error, code }}
  */
-const fetchListings = async (keyword, limit = 100) => {
-  log.info(`fetchListings: keyword="${keyword}" limit=${limit}`);
+const fetchListings = async (keyword, limit = 100, options = {}) => {
+  const { country, offset } = options;
+  log.info(`fetchListings: keyword="${keyword}" limit=${limit} offset=${offset || 0} country=${country || 'ALL'}`);
+
+  const params = { keywords: keyword, limit, sort_on: 'score' };
+  if (offset) params.offset = offset;
+  if (country) params.shop_location = country;
+
   const result = await etsyApi.publicRequest(
     'GET',
     '/v3/application/listings/active',
-    { params: { keywords: keyword, limit, sort_on: 'score' } }
+    { params }
   );
 
   if (!result.success) {
@@ -61,13 +68,18 @@ const fetchListings = async (keyword, limit = 100) => {
  * Extract related keywords from listing tags with volume estimation.
  * This is the core "eRank-style" algorithm.
  * 
+ * Fetches 3 pages of 100 listings (up to 300) for richer keyword extraction.
+ * 
  * @param {string} seedKeyword
+ * @param {Object} [options] - { country }
  * @returns {{ success, results: Array, totalResults: number, serpCalls: number, error, errorCode }}
  */
-const getRelatedKeywords = async (seedKeyword) => {
-  log.info(`getRelatedKeywords: seedKeyword="${seedKeyword}"`);
-  // Fetch top-100 listings for the seed keyword
-  const primary = await fetchListings(seedKeyword, 100);
+const getRelatedKeywords = async (seedKeyword, options = {}) => {
+  const { country } = options;
+  log.info(`getRelatedKeywords: seedKeyword="${seedKeyword}" country=${country || 'ALL'}`);
+
+  // Fetch page 1 first to check if there are results
+  const primary = await fetchListings(seedKeyword, 100, { country });
 
   if (!primary.success) {
     log.error(`getRelatedKeywords: primary fetch FAILED for "${seedKeyword}" - code=${primary.code}`);
@@ -92,8 +104,27 @@ const getRelatedKeywords = async (seedKeyword) => {
     };
   }
 
-  const listings = primary.listings;
+  let listings = primary.listings;
   const totalResults = primary.totalResults;
+  let serpCalls = 1;
+
+  // Fetch pages 2 and 3 concurrently for more keyword diversity
+  if (totalResults > 100) {
+    const extraPages = await Promise.allSettled([
+      fetchListings(seedKeyword, 100, { country, offset: 100 }),
+      totalResults > 200 ? fetchListings(seedKeyword, 100, { country, offset: 200 }) : Promise.resolve(null),
+    ]);
+
+    for (const page of extraPages) {
+      if (page.status === 'fulfilled' && page.value?.success && page.value.listings?.length > 0) {
+        listings = listings.concat(page.value.listings);
+        serpCalls++;
+      } else if (page.status === 'fulfilled' && page.value !== null) {
+        serpCalls++;
+      }
+    }
+    log.info(`getRelatedKeywords: fetched ${listings.length} total listings across ${serpCalls} pages`);
+  }
 
   // Extract autocomplete-style bigrams from top-ranked titles
   const autocompleteSuggestions = new Set();
@@ -123,10 +154,10 @@ const getRelatedKeywords = async (seedKeyword) => {
     }
   }
 
-  // Sort by frequency, take top 25 candidates
+  // Sort by frequency, take top 50 candidates
   const topKeywords = Object.entries(tagFrequency)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 25);
+    .slice(0, 50);
 
   const maxFreq = topKeywords[0]?.[1] || 1;
   const results = [];
@@ -140,7 +171,6 @@ const getRelatedKeywords = async (seedKeyword) => {
   }
 
   results.sort((a, b) => b.demandScore - a.demandScore);
-  results.splice(20);
 
   log.info(`getRelatedKeywords: SUCCESS for "${seedKeyword}" - ${results.length} keywords, totalResults=${totalResults}`);
 
@@ -148,7 +178,7 @@ const getRelatedKeywords = async (seedKeyword) => {
     success: true,
     results,
     totalResults,
-    serpCalls: 1,
+    serpCalls,
     error: null,
     errorCode: null,
   };
@@ -217,12 +247,14 @@ function analyzeKeyword(kw, ctx) {
  * Returns volume, competition, avgPrice, totalListings, trend, related keywords, and suggested tags.
  * 
  * @param {string} seedKeyword
+ * @param {Object} [options] - { country }
  * @returns {{ success, data, serpCalls, error, errorCode }}
  */
-const deepAnalyzeKeyword = async (seedKeyword) => {
-  log.info(`deepAnalyzeKeyword: seedKeyword="${seedKeyword}"`);
+const deepAnalyzeKeyword = async (seedKeyword, options = {}) => {
+  const { country } = options;
+  log.info(`deepAnalyzeKeyword: seedKeyword="${seedKeyword}" country=${country || 'ALL'}`);
   // Primary search — get top listings + aggregate data
-  const primary = await fetchListings(seedKeyword, 100);
+  const primary = await fetchListings(seedKeyword, 100, { country });
 
   if (!primary.success) {
     log.error(`deepAnalyzeKeyword: primary fetch FAILED for "${seedKeyword}" - code=${primary.code}`);
@@ -323,7 +355,7 @@ const deepAnalyzeKeyword = async (seedKeyword) => {
     let kwData = await redis.get(kwCacheKey);
 
     if (!kwData) {
-      const kwResult = await fetchListings(rel.keyword, 25);
+      const kwResult = await fetchListings(rel.keyword, 25, { country });
       serpCalls++;
 
       if (kwResult.success) {

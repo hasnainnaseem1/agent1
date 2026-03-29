@@ -23,8 +23,8 @@ const SERP_COST_PER_REQ = 0.0025;
  */
 const searchKeywords = async (req, res) => {
   try {
-    const { keyword } = req.body;
-    log.info(`searchKeywords: userId=${req.userId} keyword="${keyword}"`);
+    const { keyword, country } = req.body;
+    log.info(`searchKeywords: userId=${req.userId} keyword="${keyword}" country=${country || 'ALL'}`);
 
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
       return res.status(400).json({
@@ -34,7 +34,8 @@ const searchKeywords = async (req, res) => {
     }
 
     const seedKeyword = keyword.trim().substring(0, 100);
-    const cacheKey = `kw:${hashKey(seedKeyword)}`;
+    const countryCode = (country && typeof country === 'string') ? country.trim().toUpperCase() : null;
+    const cacheKey = `kw:${hashKey(seedKeyword + (countryCode || ''))}`;
 
     // Check cache
     const cached = await redis.get(cacheKey);
@@ -55,7 +56,7 @@ const searchKeywords = async (req, res) => {
     }
 
     // Use the keyword service for the actual estimation
-    const searchData = await keywordService.getRelatedKeywords(seedKeyword);
+    const searchData = await keywordService.getRelatedKeywords(seedKeyword, { country: countryCode });
 
     // Distinguish API error from genuine 0 results
     if (!searchData.success) {
@@ -121,7 +122,7 @@ const searchKeywords = async (req, res) => {
  */
 const deepAnalysis = async (req, res) => {
   try {
-    const { keyword } = req.body;
+    const { keyword, country } = req.body;
 
     if (!keyword || typeof keyword !== 'string' || keyword.trim().length === 0) {
       return res.status(400).json({
@@ -131,7 +132,8 @@ const deepAnalysis = async (req, res) => {
     }
 
     const seedKeyword = keyword.trim().substring(0, 100);
-    const cacheKey = `kw:deep:${hashKey(seedKeyword)}`;
+    const countryCode = (country && typeof country === 'string') ? country.trim().toUpperCase() : null;
+    const cacheKey = `kw:deep:${hashKey(seedKeyword + (countryCode || ''))}`;
 
     // Check cache
     const cached = await redis.get(cacheKey);
@@ -152,7 +154,7 @@ const deepAnalysis = async (req, res) => {
     }
 
     // Use the keyword service for deep analysis
-    const analysis = await keywordService.deepAnalyzeKeyword(seedKeyword);
+    const analysis = await keywordService.deepAnalyzeKeyword(seedKeyword, { country: countryCode });
 
     // Distinguish API error from genuine 0 results
     if (!analysis.success) {
