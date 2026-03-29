@@ -36,22 +36,30 @@ const getClient = () => {
   const url = process.env.REDIS_URL || 'redis://localhost:6379';
 
   client = new Redis(url, {
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 1,
     retryStrategy(times) {
-      if (times > 3) return null; // Stop retrying after 3 attempts
-      return Math.min(times * 200, 2000);
+      if (times > 2) return null; // Stop retrying after 2 attempts
+      return Math.min(times * 500, 2000);
     },
+    reconnectOnError: () => false,
     lazyConnect: true,
   });
 
+  let errorLogged = false;
+
   client.on('connect', () => {
     isConnected = true;
+    errorLogged = false;
     log.info('Connected');
   });
 
   client.on('error', (err) => {
     isConnected = false;
-    log.error('Error:', err.message);
+    if (!errorLogged) {
+      log.error(err.message);
+      log.warn('Redis unavailable — caching disabled, falling back to direct queries');
+      errorLogged = true;
+    }
   });
 
   client.on('close', () => {

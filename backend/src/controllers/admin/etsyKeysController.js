@@ -1,3 +1,4 @@
+const log = require('../../utils/logger')('AdminEtsyKeys');
 /**
  * Admin Etsy API Keys Controller
  * 
@@ -28,7 +29,7 @@ const listKeys = async (req, res) => {
 
     return res.json({ success: true, data: masked });
   } catch (error) {
-    console.error('[AdminEtsyKeys] listKeys error:', error);
+    log.error('listKeys error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to list API keys' });
   }
 };
@@ -77,7 +78,7 @@ const addKey = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[AdminEtsyKeys] addKey error:', error);
+    log.error('addKey error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to add API key' });
   }
 };
@@ -110,7 +111,7 @@ const updateKey = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[AdminEtsyKeys] updateKey error:', error);
+    log.error('updateKey error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to update API key' });
   }
 };
@@ -128,7 +129,7 @@ const deleteKey = async (req, res) => {
 
     return res.json({ success: true, message: 'API key removed' });
   } catch (error) {
-    console.error('[AdminEtsyKeys] deleteKey error:', error);
+    log.error('deleteKey error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to delete API key' });
   }
 };
@@ -154,7 +155,7 @@ const toggleKey = async (req, res) => {
       data: { _id: key._id, status: key.status },
     });
   } catch (error) {
-    console.error('[AdminEtsyKeys] toggleKey error:', error);
+    log.error('toggleKey error:', error.message);
     return res.status(500).json({ success: false, message: 'Failed to toggle API key' });
   }
 };
