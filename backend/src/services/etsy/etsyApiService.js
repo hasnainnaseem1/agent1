@@ -55,7 +55,10 @@ const publicRequest = async (method, path, options = {}) => {
       const url = buildUrl(path, options.params);
       log.info(`publicRequest: ${method} ${url} (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
 
-      const apiKeyHeader = key.sharedSecret ? `${key.apiKey}:${key.sharedSecret}` : key.apiKey;
+      if (!key.sharedSecret) {
+        log.error(`publicRequest: sharedSecret is EMPTY for key label="${key.label}" — Etsy will reject this with 403`);
+      }
+      const apiKeyHeader = `${key.apiKey}:${key.sharedSecret || ''}`;
 
       const response = await fetch(url, {
         method,
@@ -147,7 +150,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
   // Try key pool first, fall back to OAuth config from AdminSettings
   try {
     key = await getNextKey();
-    apiKeyHeader = key.sharedSecret ? `${key.apiKey}:${key.sharedSecret}` : key.apiKey;
+    apiKeyHeader = `${key.apiKey}:${key.sharedSecret || ''}`;
     log.info(`authRequest: key acquired (label=${key.label})`);
   } catch (err) {
     log.warn('authRequest: key pool empty, falling back to AdminSettings -', err.message);
@@ -160,7 +163,7 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
         return { success: false, error: 'No API keys available', code: 'NO_KEYS_AVAILABLE' };
       }
       const clientSecret = etsy.clientSecret || process.env.ETSY_CLIENT_SECRET || '';
-      apiKeyHeader = clientSecret ? `${clientId}:${clientSecret}` : clientId;
+      apiKeyHeader = `${clientId}:${clientSecret}`;
       log.info('authRequest: using AdminSettings clientId as fallback');
     } catch {
       log.error('authRequest: NO API KEYS - pool empty AND AdminSettings query failed');
