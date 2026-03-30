@@ -68,19 +68,26 @@ const fetchListings = async (keyword, limit = 100, options = {}) => {
 /**
  * Extract related keywords from listing tags with volume estimation.
  * This is the core "eRank-style" algorithm.
- * 
- * Fetches up to 5 pages of 100 listings (up to 500) for richer keyword extraction.
- * 
+ *
+ * Pagination strategy:
+ *   - Always fires page 1 first to get totalResults count.
+ *   - Then fires up to 4 more pages (offsets 100-400) concurrently via Promise.allSettled.
+ *   - Listings are deduplicated by listing_id across all pages.
+ *   - All unique tags are frequency-counted, top 200 candidates are enriched.
+ *
  * @param {string} seedKeyword
  * @param {Object} [options] - { country }
  * @returns {{ success, results: Array, totalResults: number, serpCalls: number, error, errorCode }}
  */
 const getRelatedKeywords = async (seedKeyword, options = {}) => {
   const { country } = options;
-  log.info(`getRelatedKeywords: seedKeyword="${seedKeyword}" country=${country || 'ALL'}`);
+  const MAX_PAGES = 5;
+  const PAGE_SIZE = 100;
 
-  // Fetch page 1 first to check if there are results
-  const primary = await fetchListings(seedKeyword, 100, { country });
+  log.info(`getRelatedKeywords: seed="${seedKeyword}" country=${country || 'ALL'} maxPages=${MAX_PAGES}`);
+
+  // ── Page 1 (sequential — need totalResults before deciding how many extra pages) ──
+  const primary = await fetchListings(seedKeyword, PAGE_SIZE, { country });
 
   if (!primary.success) {
     log.error(`getRelatedKeywords: primary fetch FAILED for "${seedKeyword}" - code=${primary.code}`);
@@ -105,50 +112,78 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
     };
   }
 
-  let listings = primary.listings;
+  // Deduplicate by listing_id using a Map
+  const listingMap = new Map();
+  for (const l of primary.listings) {
+    listingMap.set(l.listing_id, l);
+  }
   const totalResults = primary.totalResults;
   let serpCalls = 1;
+  let pagesSucceeded = 1;
+  let pagesFailed = 0;
 
-  // Fetch pages 2-5 concurrently for more keyword diversity
-  if (totalResults > 100) {
-    const pagesToFetch = [];
-    for (let page = 1; page < 5 && totalResults > page * 100; page++) {
-      pagesToFetch.push(fetchListings(seedKeyword, 100, { country, offset: page * 100 }));
+  // ── Pages 2-5 (concurrent via Promise.allSettled) ──
+  const extraPageCount = Math.min(MAX_PAGES - 1, Math.ceil(totalResults / PAGE_SIZE) - 1);
+
+  if (extraPageCount > 0) {
+    const pageFetches = [];
+    for (let p = 1; p <= extraPageCount; p++) {
+      pageFetches.push(
+        fetchListings(seedKeyword, PAGE_SIZE, { country, offset: p * PAGE_SIZE })
+      );
     }
-    const extraPages = await Promise.allSettled(pagesToFetch);
 
-    for (const page of extraPages) {
-      if (page.status === 'fulfilled' && page.value?.success && page.value.listings?.length > 0) {
-        listings = listings.concat(page.value.listings);
-        serpCalls++;
-      } else if (page.status === 'fulfilled') {
-        serpCalls++;
+    log.info(`getRelatedKeywords: firing ${pageFetches.length} extra pages concurrently (offsets ${
+      Array.from({ length: extraPageCount }, (_, i) => (i + 1) * PAGE_SIZE).join(', ')
+    })`);
+
+    const settled = await Promise.allSettled(pageFetches);
+
+    for (let i = 0; i < settled.length; i++) {
+      const result = settled[i];
+      serpCalls++;
+
+      if (result.status === 'fulfilled' && result.value?.success && result.value.listings?.length > 0) {
+        for (const l of result.value.listings) {
+          listingMap.set(l.listing_id, l); // dedup by listing_id
+        }
+        pagesSucceeded++;
+      } else {
+        pagesFailed++;
+        const reason = result.status === 'rejected'
+          ? result.reason?.message
+          : result.value?.error || 'empty page';
+        log.warn(`getRelatedKeywords: page ${i + 2} failed — ${reason}`);
       }
     }
-    log.info(`getRelatedKeywords: fetched ${listings.length} total listings across ${serpCalls} pages`);
   }
 
-  // Extract autocomplete-style bigrams from top-ranked titles
+  const listings = Array.from(listingMap.values());
+  log.info(`getRelatedKeywords: ${listings.length} unique listings from ${pagesSucceeded}/${serpCalls} successful pages (${pagesFailed} failed)`);
+
+  // ── Autocomplete bigram extraction (scan up to 100 top-ranked listings) ──
   const autocompleteSuggestions = new Set();
-  const seedFirstWord = seedKeyword.toLowerCase().split(' ')[0];
-  for (const l of listings.slice(0, 25)) {
+  const seedWords = seedKeyword.toLowerCase().split(/\s+/);
+  for (const l of listings.slice(0, 100)) {
     const titleWords = l.title.toLowerCase().split(/[\s\-–—,|·]+/).filter(w => w.length > 2);
     for (let i = 0; i < titleWords.length - 1; i++) {
       const bigram = `${titleWords[i]} ${titleWords[i + 1]}`;
-      if (bigram.includes(seedFirstWord)) {
+      if (seedWords.some(sw => bigram.includes(sw))) {
         autocompleteSuggestions.add(bigram);
       }
     }
   }
 
-  // Build tag frequency, view, and favorites accumulators
+  // ── Tag frequency, view & favorites accumulators (deduplicated listings) ──
   const tagFrequency = {};
   const tagViewAccum = {};
   const tagFavorites = {};
+  const seedLower = seedKeyword.toLowerCase();
+
   for (const listing of listings) {
     for (const tag of (listing.tags || [])) {
       const normalized = tag.toLowerCase().trim();
-      if (normalized && normalized !== seedKeyword.toLowerCase()) {
+      if (normalized && normalized !== seedLower) {
         tagFrequency[normalized] = (tagFrequency[normalized] || 0) + 1;
         tagViewAccum[normalized] = (tagViewAccum[normalized] || 0) + (listing.views || 0);
         tagFavorites[normalized] = (tagFavorites[normalized] || 0) + (listing.num_favorers || 0);
@@ -156,10 +191,13 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
     }
   }
 
-  // Sort by frequency, take top 150 candidates
+  const uniqueTagCount = Object.keys(tagFrequency).length;
+  log.info(`getRelatedKeywords: ${uniqueTagCount} unique tags extracted from ${listings.length} listings`);
+
+  // ── Rank & enrich top 200 candidates ──
   const topKeywords = Object.entries(tagFrequency)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 150);
+    .slice(0, 200);
 
   const maxFreq = topKeywords[0]?.[1] || 1;
   const results = [];
@@ -174,7 +212,7 @@ const getRelatedKeywords = async (seedKeyword, options = {}) => {
 
   results.sort((a, b) => b.demandScore - a.demandScore);
 
-  log.info(`getRelatedKeywords: SUCCESS for "${seedKeyword}" - ${results.length} keywords, totalResults=${totalResults}`);
+  log.info(`getRelatedKeywords: SUCCESS for "${seedKeyword}" — ${results.length} keywords ranked, totalResults=${totalResults}, serpCalls=${serpCalls}`);
 
   return {
     success: true,
