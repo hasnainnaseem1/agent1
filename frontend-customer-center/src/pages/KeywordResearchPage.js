@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Card, Input, Select, Button, Table, Tag, Typography, Row, Col,
-  Space, Empty, message, theme,
+  Space, Empty, message, theme, Modal,
 } from 'antd';
 import {
-  SearchOutlined, GlobalOutlined, KeyOutlined,
+  SearchOutlined, GlobalOutlined, KeyOutlined, LockOutlined, CrownOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
 import QuotaBanner from '../components/common/QuotaBanner';
@@ -36,8 +37,9 @@ const compColor = (comp) => {
 const KeywordResearchPage = () => {
   const { isDark } = useTheme();
   const { token: tok } = theme.useToken();
-  const { getFeatureAccess, incrementUsage } = usePermissions();
+  const { getFeatureAccess, incrementUsage, plan } = usePermissions();
   const access = getFeatureAccess('keyword_search');
+  const navigate = useNavigate();
 
   const [keyword, setKeyword] = useState('');
   const [country, setCountry] = useState('US');
@@ -47,6 +49,10 @@ const KeywordResearchPage = () => {
   const [searched, setSearched] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+
+  // Upgrade modal state
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [lockedCountry, setLockedCountry] = useState(null);
 
   useEffect(() => {
     etsyApi.getCountries()
@@ -198,13 +204,42 @@ const KeywordResearchPage = () => {
             <Col xs={12} md={6}>
               <Select
                 value={country}
-                onChange={setCountry}
-                options={countries}
+                onChange={(val) => {
+                  const c = countries.find(ct => ct.value === val);
+                  if (c?.isLocked) {
+                    setLockedCountry(c);
+                    setUpgradeOpen(true);
+                    return;
+                  }
+                  setCountry(val);
+                }}
+                options={countries.map(c => ({
+                  value: c.value,
+                  label: c.label,
+                  disabled: false, // keep selectable to intercept click
+                }))}
                 size="large"
                 style={{ width: '100%' }}
                 prefix={<GlobalOutlined />}
                 showSearch
                 optionFilterProp="label"
+                optionRender={(option) => {
+                  const c = countries.find(ct => ct.value === option.value);
+                  const locked = c?.isLocked;
+                  return (
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      opacity: locked ? 0.55 : 1,
+                    }}>
+                      <span style={{ color: locked ? tok.colorTextDisabled : undefined }}>
+                        {option.label}
+                      </span>
+                      {locked && (
+                        <LockOutlined style={{ fontSize: 12, color: colors.muted, marginLeft: 8 }} />
+                      )}
+                    </div>
+                  );
+                }}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -271,6 +306,72 @@ const KeywordResearchPage = () => {
           )}
         </Card>
       </FeatureGate>
+
+      {/* Country Upgrade Modal */}
+      <Modal
+        open={upgradeOpen}
+        onCancel={() => setUpgradeOpen(false)}
+        footer={null}
+        centered
+        width={480}
+        styles={{
+          content: {
+            borderRadius: radii.lg,
+            background: isDark ? tok.colorBgContainer : '#fff',
+            padding: 0,
+            overflow: 'hidden',
+          },
+        }}
+      >
+        <div style={{
+          background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight})`,
+          padding: '32px 32px 24px',
+          textAlign: 'center',
+        }}>
+          <span style={{ fontSize: 40, display: 'block', marginBottom: 12 }}>🌍</span>
+          <Typography.Title level={3} style={{ color: '#fff', margin: 0 }}>
+            Unlock {lockedCountry?.name || 'International'} Market Data!
+          </Typography.Title>
+          <Typography.Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14, display: 'block', marginTop: 8 }}>
+            International keyword analytics are reserved for our premium sellers.
+          </Typography.Text>
+        </div>
+
+        <div style={{ padding: '24px 32px 32px' }}>
+          <div style={{
+            background: isDark ? 'rgba(255,255,255,0.04)' : '#f9f9fb',
+            borderRadius: radii.sm,
+            padding: '16px 20px',
+            marginBottom: 20,
+            textAlign: 'center',
+          }}>
+            <Typography.Text style={{ fontSize: 14 }}>
+              Upgrade to the <Tag color="purple" style={{ fontWeight: 600, fontSize: 13 }}>{lockedCountry?.requiredPlan}</Tag> plan
+              to see what buyers in <strong>{lockedCountry?.name}</strong> are searching for.
+            </Typography.Text>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, justifyContent: 'center' }}>
+            <Tag style={{ fontSize: 12, padding: '2px 10px' }}>Current Plan: {plan.name}</Tag>
+          </div>
+
+          <Button
+            type="primary"
+            block
+            size="large"
+            icon={<CrownOutlined />}
+            onClick={() => { setUpgradeOpen(false); navigate('/settings?tab=plans'); }}
+            style={{
+              background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight})`,
+              border: 'none', borderRadius: radii.sm,
+              fontWeight: 600, height: 48,
+              boxShadow: '0 4px 14px rgba(108,99,255,0.4)',
+            }}
+          >
+            View Upgrade Plans
+          </Button>
+        </div>
+      </Modal>
     </AppLayout>
   );
 };

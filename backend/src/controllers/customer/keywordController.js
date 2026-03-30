@@ -14,6 +14,7 @@ const keywordService = require('../../services/etsy/etsyKeywordService');
 const redis = require('../../services/cache/redisService');
 const crypto = require('crypto');
 const log = require('../../utils/logger')('KeywordCtrl');
+const { isPlanAllowed, getRequiredPlan } = require('../../utils/constants/countryTiers');
 
 const SERP_COST_PER_REQ = 0.0025;
 
@@ -76,6 +77,22 @@ const searchKeywords = async (req, res) => {
 
     const seedKeyword = keyword.trim().substring(0, 100);
     const countryCode = (country && typeof country === 'string') ? country.trim().toUpperCase() : null;
+
+    // Validate country against user's plan tier
+    if (countryCode) {
+      const planName = req.user?.planSnapshot?.planName || '';
+      if (!isPlanAllowed(planName, countryCode)) {
+        const required = getRequiredPlan(countryCode);
+        log.warn(`searchKeywords: BLOCKED country=${countryCode} for plan="${planName}" (requires ${required})`);
+        return res.status(403).json({
+          success: false,
+          errorCode: 'UPGRADE_REQUIRED',
+          message: `The ${countryCode} market is available on the ${required} plan and above. Please upgrade to access this region.`,
+          requiredPlan: required,
+        });
+      }
+    }
+
     const cacheKey = `kw:${hashKey(seedKeyword + (countryCode || ''))}`;
 
     // Check cache
@@ -194,6 +211,21 @@ const deepAnalysis = async (req, res) => {
 
     const seedKeyword = keyword.trim().substring(0, 100);
     const countryCode = (country && typeof country === 'string') ? country.trim().toUpperCase() : null;
+
+    // Validate country against user's plan tier
+    if (countryCode) {
+      const planName = req.user?.planSnapshot?.planName || '';
+      if (!isPlanAllowed(planName, countryCode)) {
+        const required = getRequiredPlan(countryCode);
+        return res.status(403).json({
+          success: false,
+          errorCode: 'UPGRADE_REQUIRED',
+          message: `The ${countryCode} market is available on the ${required} plan and above. Please upgrade to access this region.`,
+          requiredPlan: required,
+        });
+      }
+    }
+
     const cacheKey = `kw:deep:${hashKey(seedKeyword + (countryCode || ''))}`;
 
     // Check cache
