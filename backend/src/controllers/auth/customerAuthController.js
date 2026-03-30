@@ -189,11 +189,12 @@ const googleSSO = async (req, res) => {
             planId: defaultPlan._id,
             planName: defaultPlan.name,
             features: (defaultPlan.features || []).map(f => ({
-              featureId: f._id,
+              featureId: f.featureId || f._id,
               featureKey: f.featureKey,
               featureName: f.featureName,
-              value: f.value,
               enabled: f.enabled,
+              limit: f.limit,
+              value: f.value,
             })),
           };
         }

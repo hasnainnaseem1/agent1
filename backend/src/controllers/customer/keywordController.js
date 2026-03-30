@@ -18,12 +18,45 @@ const log = require('../../utils/logger')('KeywordCtrl');
 const SERP_COST_PER_REQ = 0.0025;
 
 // Plan-based result limits for keyword search
+// Keys are lowercase for case-insensitive matching.
+// Covers both Phase 1 names (Starter, Elite) and Phase 2 names (Basic, Pro Plus).
 const PLAN_RESULT_LIMITS = {
-  'Free': 5,
-  'Starter': 25,
-  'Pro': 75,
-  'Elite': Infinity,
+  'free':      5,
+  'basic':     25,
+  'starter':   25,
+  'pro':       75,
+  'pro plus':  Infinity,
+  'pro_plus':  Infinity,
+  'elite':     Infinity,
+  'unlimited': Infinity,
 };
+
+/**
+ * Resolve how many keyword results the user's plan allows.
+ * Uses planSnapshot.planName with case-insensitive matching.
+ * Falls back to the feature-level limit from checkFeatureAccess if plan name is missing.
+ */
+function getResultLimit(req) {
+  const planName = req.user?.planSnapshot?.planName;
+  const key = (planName || '').toLowerCase().trim();
+
+  log.info(`getResultLimit: planSnapshot.planName="${planName}" key="${key}" featureAccess.limit=${req.featureAccess?.limit}`);
+
+  if (key && PLAN_RESULT_LIMITS[key] !== undefined) {
+    return { limit: PLAN_RESULT_LIMITS[key], plan: planName };
+  }
+
+  // Fallback: if planName is unknown, use featureAccess.limit (set by checkFeatureAccess middleware)
+  // High feature limits (500+) indicate a premium plan → don't slice at all
+  const featureLimit = req.featureAccess?.limit;
+  if (featureLimit && featureLimit >= 500) {
+    return { limit: Infinity, plan: planName || 'unknown (feature-limit-based)' };
+  }
+
+  // Last resort: default to Free
+  log.warn(`getResultLimit: could not resolve plan for user ${req.userId}, defaulting to Free (5)`);
+  return { limit: 5, plan: planName || 'Free' };
+}
 
 /**
  * POST /api/v1/customer/keywords/search
@@ -58,9 +91,9 @@ const searchKeywords = async (req, res) => {
       });
 
       // Plan-based slicing on cached results too
-      const planName = req.user?.planSnapshot?.planName || 'Free';
-      const maxResults = PLAN_RESULT_LIMITS[planName] ?? 5;
-      const slicedCached = Number.isFinite(maxResults) ? cached.slice(0, maxResults) : cached;
+      const { limit: maxCached, plan: cachedPlan } = getResultLimit(req);
+      const slicedCached = Number.isFinite(maxCached) ? cached.slice(0, maxCached) : cached;
+      log.info(`searchKeywords(cached): plan="${cachedPlan}" limit=${maxCached} total=${cached.length} returned=${slicedCached.length}`);
 
       return res.json({
         success: true,
@@ -70,7 +103,7 @@ const searchKeywords = async (req, res) => {
           cached: true,
           totalKeywords: cached.length,
           returnedKeywords: slicedCached.length,
-          plan: planName,
+          plan: cachedPlan,
         },
       });
     }
@@ -119,9 +152,9 @@ const searchKeywords = async (req, res) => {
     }
 
     // Plan-based result slicing — return only what the plan allows
-    const planName = req.user?.planSnapshot?.planName || 'Free';
-    const maxResults = PLAN_RESULT_LIMITS[planName] ?? 5;
+    const { limit: maxResults, plan: resolvedPlan } = getResultLimit(req);
     const slicedResults = Number.isFinite(maxResults) ? results.slice(0, maxResults) : results;
+    log.info(`searchKeywords: plan="${resolvedPlan}" limit=${maxResults} total=${results.length} returned=${slicedResults.length}`);
 
     return res.json({
       success: true,
@@ -132,7 +165,7 @@ const searchKeywords = async (req, res) => {
         totalResults: searchData.totalResults,
         totalKeywords: results.length,
         returnedKeywords: slicedResults.length,
-        plan: planName,
+        plan: resolvedPlan,
       },
     });
   } catch (error) {
