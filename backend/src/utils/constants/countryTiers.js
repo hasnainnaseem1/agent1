@@ -4,11 +4,14 @@
  * Defines which countries are accessible at each subscription plan level.
  * Used by the /meta/countries endpoint and the keyword search controller
  * to enforce plan-based country gating.
+ *
+ * All codes are stored UPPERCASE for consistent comparison.
+ * "GLOBAL" is a virtual code meaning "no country filter".
  */
 
-const FREE_REGIONS = ['US', 'Global'];
+const FREE_REGIONS = ['US', 'GLOBAL'];
 
-const BASIC_REGIONS = ['US', 'GB', 'CA', 'AU', 'Global'];
+const BASIC_REGIONS = ['US', 'GB', 'CA', 'AU', 'GLOBAL'];
 
 const PRO_REGIONS = [
   ...BASIC_REGIONS,
@@ -36,23 +39,27 @@ const PLAN_REGION_MAP = {
 
 /**
  * Get the minimum plan required to unlock a given country code.
+ * Accepts any casing — normalizes to uppercase internally.
  */
 function getRequiredPlan(countryCode) {
-  if (FREE_REGIONS.includes(countryCode)) return 'Free';
-  if (BASIC_REGIONS.includes(countryCode)) return 'Basic';
-  if (PRO_REGIONS.includes(countryCode)) return 'Pro';
+  const code = (countryCode || '').toUpperCase().trim();
+  if (FREE_REGIONS.includes(code)) return 'Free';
+  if (BASIC_REGIONS.includes(code)) return 'Basic';
+  if (PRO_REGIONS.includes(code)) return 'Pro';
   return 'Pro Plus';
 }
 
 /**
  * Check if a plan (by name) is allowed to access a given country code.
+ * Accepts any casing — normalizes both plan name and country code internally.
  * Returns true if allowed, false if locked.
  */
 function isPlanAllowed(planName, countryCode) {
   const key = (planName || '').toLowerCase().trim();
+  const code = (countryCode || '').toUpperCase().trim();
   const allowed = PLAN_REGION_MAP[key] || FREE_REGIONS;
   if (allowed === 'ALL') return true;
-  return allowed.includes(countryCode);
+  return allowed.includes(code);
 }
 
 module.exports = {
