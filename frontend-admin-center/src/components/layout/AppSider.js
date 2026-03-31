@@ -10,6 +10,7 @@ import {
   GlobalOutlined,
   BellOutlined,
   ApiOutlined,
+  DatabaseOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePermission } from '../../hooks/usePermission';
@@ -129,6 +130,7 @@ const AppSider = ({ collapsed }) => {
       adminChildren.push({ key: '/departments', label: 'Departments' });
       adminChildren.push({ key: '/settings', label: 'Settings' });
       adminChildren.push({ key: '/integrations', label: 'Integrations', icon: <ApiOutlined /> });
+      adminChildren.push({ key: '/keyword-snapshots', label: 'Keyword Snapshots', icon: <DatabaseOutlined /> });
     }
     if (adminChildren.length > 0) {
       items.push({

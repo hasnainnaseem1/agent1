@@ -32,6 +32,7 @@ import RedirectsPage from './pages/seo/RedirectsPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 import AdminProfilePage from './pages/profile/ProfilePage';
 import IntegrationsPage from './pages/integrations/IntegrationsPage';
+import KeywordSnapshotsPage from './pages/keywords/KeywordSnapshotsPage';
 import { PERMISSIONS } from './utils/permissions';
 import { FeatureProvider } from './contexts/FeatureContext';
 import { useBranding } from './contexts/useBranding';
@@ -75,6 +76,7 @@ function App() {
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="profile" element={<AdminProfilePage />} />
           <Route path="integrations" element={<PermissionGuard permission={PERMISSIONS.SETTINGS_VIEW}><IntegrationsPage /></PermissionGuard>} />
+          <Route path="keyword-snapshots" element={<PermissionGuard permission={PERMISSIONS.SETTINGS_VIEW}><KeywordSnapshotsPage /></PermissionGuard>} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

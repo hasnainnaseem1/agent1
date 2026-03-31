@@ -58,6 +58,49 @@ const keywordSnapshotSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+
+  // ── Layer 2: Google Trends data ──
+  googleTrends: {
+    // Most recent week interest score (0-100)
+    interest: { type: Number, default: null },
+    // 12-month average interest
+    avg: { type: Number, default: null },
+    // Trend direction from Google Trends
+    trend: { type: String, enum: ['rising', 'stable', 'declining', 'insufficient', 'unknown', null], default: null },
+    // Peak interest in last 12 months
+    peak: { type: Number, default: null },
+    // Trough interest in last 12 months
+    trough: { type: Number, default: null },
+    // Seasonality detection
+    seasonality: { type: String, enum: ['seasonal', 'year-round', 'unknown', null], default: null },
+  },
+
+  // ── Layer 3: Listing Freshness ──
+  freshness: {
+    // % of sampled listings created in the last 30 days
+    newListingPct: { type: Number, default: null },
+    // Average age of sampled listings in days
+    avgListingAgeDays: { type: Number, default: null },
+    // Market entry rate signal (hot/warm/stagnant)
+    marketSignal: { type: String, enum: ['hot', 'warm', 'stagnant', null], default: null },
+  },
+
+  // ── Layer 4: Engagement Velocity ──
+  velocity: {
+    // Average views per day per listing (views / listing_age_days)
+    avgViewsPerDay: { type: Number, default: null },
+    // Average favorites per day per listing
+    avgFavoritesPerDay: { type: Number, default: null },
+  },
+
+  // ── Layer 5: Fusion Score ──
+  fusionScore: {
+    type: Number,
+    default: null,
+    min: 0,
+    max: 100,
+  },
+
   // Date of the snapshot (midnight UTC, one per keyword per day)
   snapshotDate: {
     type: Date,
@@ -91,7 +134,7 @@ keywordSnapshotSchema.statics.getTrend = async function (keyword, days = 30, cou
 
   return this.find(match)
     .sort({ snapshotDate: 1 })
-    .select('snapshotDate totalResults avgViews avgFavorites competitionPct favViewRatio')
+    .select('snapshotDate totalResults avgViews avgFavorites competitionPct favViewRatio googleTrends freshness velocity fusionScore')
     .lean();
 };
 
