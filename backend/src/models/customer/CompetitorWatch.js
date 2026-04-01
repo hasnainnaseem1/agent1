@@ -17,11 +17,15 @@ const competitorWatchSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  shopCountry: { type: String, default: '' },
+  iconUrl: { type: String, default: '' },
   // Latest snapshot data (denormalized for fast display)
   latestSnapshot: {
     totalSales: { type: Number, default: 0 },
     totalListings: { type: Number, default: 0 },
     avgPrice: { type: Number, default: 0 },
+    rating: { type: Number, default: 0 },
+    reviewCount: { type: Number, default: 0 },
     dailySalesDelta: { type: Number, default: 0 },
     capturedAt: { type: Date, default: null },
   },

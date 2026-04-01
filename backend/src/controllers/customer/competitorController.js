@@ -1,13 +1,15 @@
 /**
  * Competitor Controller
- * 
- * POST   /api/v1/customer/competitors/watch         → Add competitor to watch list
- * DELETE /api/v1/customer/competitors/watch/:id      → Remove competitor
- * GET    /api/v1/customer/competitors/watch          → Get watch list with latest data
- * GET    /api/v1/customer/competitors/:id/snapshot   → Get snapshot history for a competitor
- * GET    /api/v1/customer/competitors/:id/sales      → Get sales data (daily delta)
- * POST   /api/v1/customer/competitors/:id/refresh    → Force refresh a competitor's data
- * 
+ *
+ * POST   /api/v1/customer/competitors/watch            → Add competitor to watch list
+ * DELETE /api/v1/customer/competitors/watch/:id         → Remove competitor
+ * GET    /api/v1/customer/competitors/watch             → Get watch list with latest data
+ * GET    /api/v1/customer/competitors/:id/snapshots     → Get snapshot history
+ * GET    /api/v1/customer/competitors/:id/sales         → Get sales data (daily delta)
+ * POST   /api/v1/customer/competitors/:id/refresh       → Force refresh a competitor
+ * POST   /api/v1/customer/competitors/refresh-all       → Refresh all competitors
+ * GET    /api/v1/customer/competitors/sales/overview     → Aggregated sales overview
+ *
  * Feature keys: competitor_tracking, competitor_sales
  */
 
@@ -19,19 +21,77 @@ const log = require('../../utils/logger')('Competitor');
 
 const SERP_COST_PER_REQ = 0.0025;
 
+/* ─── helpers ─── */
+
+function hashKey(str) {
+  return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
+}
+
 /**
- * POST /api/v1/customer/competitors/watch
- * Add a competitor shop to the watch list.
+ * Fetch shop + top listings from Etsy.
+ * Returns { shopData, serpCalls } or { shopData: null } on failure.
  */
+async function fetchShopData(shopNameOrId) {
+  let serpCalls = 0;
+
+  const shopResult = await etsyApi.publicRequest(
+    'GET',
+    `/v3/application/shops/${shopNameOrId}`
+  );
+  serpCalls++;
+
+  if (!shopResult.success) {
+    return { shopData: null, serpCalls };
+  }
+
+  const shop = shopResult.data;
+
+  const listingsResult = await etsyApi.publicRequest(
+    'GET',
+    `/v3/application/shops/${shop.shop_id}/listings/active`,
+    { params: { limit: 25, sort_on: 'score' } }
+  );
+  serpCalls++;
+
+  const allListings = listingsResult.success ? (listingsResult.data.results || []) : [];
+  const topListings = allListings.slice(0, 10).map(l => ({
+    listingId: String(l.listing_id),
+    title: l.title || '',
+    price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
+    views: l.views || 0,
+    favorites: l.num_favorers || 0,
+    tags: l.tags || [],
+  }));
+
+  const avgPrice = topListings.length > 0
+    ? Math.round(topListings.reduce((s, l) => s + l.price, 0) / topListings.length * 100) / 100
+    : 0;
+
+  return {
+    shopData: {
+      etsyShopId: String(shop.shop_id),
+      shopName: shop.shop_name,
+      totalSales: shop.transaction_sold_count || 0,
+      totalListings: shop.listing_active_count || 0,
+      rating: shop.review_average || 0,
+      reviewCount: shop.review_count || 0,
+      shopCountry: shop.shipping_from_country_iso || shop.shop_location_country_iso || '',
+      iconUrl: shop.icon_url_fullxfull || '',
+      avgPrice,
+      topListings,
+    },
+    serpCalls,
+  };
+}
+
+/* ─── POST /watch ─── */
+
 const addCompetitor = async (req, res) => {
   try {
     const { shopName } = req.body;
 
     if (!shopName || typeof shopName !== 'string') {
-      return res.status(400).json({
-        success: false,
-        message: 'Shop name is required',
-      });
+      return res.status(400).json({ success: false, message: 'Shop name is required' });
     }
 
     const cleanName = shopName.trim().replace(/[^a-zA-Z0-9\-_]/g, '');
@@ -42,100 +102,61 @@ const addCompetitor = async (req, res) => {
       });
     }
 
-    // Check if already watching
     const existing = await CompetitorWatch.findOne({
       userId: req.userId,
       shopName: { $regex: new RegExp(`^${cleanName}$`, 'i') },
     });
-
     if (existing) {
-      return res.status(409).json({
-        success: false,
-        message: 'You are already tracking this shop',
-      });
+      return res.status(409).json({ success: false, message: 'You are already tracking this shop' });
     }
 
-    // Fetch shop info from Etsy
     const cacheKey = `competitor:${hashKey(cleanName)}`;
     let shopData = await redis.get(cacheKey);
     let serpCalls = 0;
 
     if (!shopData) {
-      const shopResult = await etsyApi.publicRequest(
-        'GET',
-        `/v3/application/shops/${cleanName}`
-      );
-      serpCalls++;
+      const result = await fetchShopData(cleanName);
+      serpCalls = result.serpCalls;
+      shopData = result.shopData;
 
-      if (!shopResult.success) {
+      if (!shopData) {
         return res.status(404).json({
           success: false,
           message: 'Etsy shop not found. Please check the shop name.',
         });
       }
-
-      const shop = shopResult.data;
-
-      // Get top listings
-      const listingsResult = await etsyApi.publicRequest(
-        'GET',
-        `/v3/application/shops/${shop.shop_id}/listings`,
-        { params: { limit: 10, sort_on: 'score' } }
-      );
-      serpCalls++;
-
-      const topListings = (listingsResult.success ? listingsResult.data.results : [])
-        .map(l => ({
-          listingId: String(l.listing_id),
-          title: l.title || '',
-          price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
-          views: l.views || 0,
-          favorites: l.num_favorers || 0,
-          tags: l.tags || [],
-        }));
-
-      const avgPrice = topListings.length > 0
-        ? Math.round(topListings.reduce((s, l) => s + l.price, 0) / topListings.length * 100) / 100
-        : 0;
-
-      shopData = {
-        etsyShopId: String(shop.shop_id),
-        shopName: shop.shop_name,
-        totalSales: shop.transaction_sold_count || 0,
-        totalListings: shop.listing_active_count || 0,
-        avgPrice,
-        topListings,
-      };
-
-      await redis.set(cacheKey, shopData, 3600); // 1 hour
+      await redis.set(cacheKey, shopData, 3600);
     }
 
-    // Create watch entry
     const watch = await CompetitorWatch.create({
       userId: req.userId,
       shopName: shopData.shopName,
       etsyShopId: shopData.etsyShopId,
+      shopCountry: shopData.shopCountry,
+      iconUrl: shopData.iconUrl,
       latestSnapshot: {
         totalSales: shopData.totalSales,
         totalListings: shopData.totalListings,
         avgPrice: shopData.avgPrice,
+        rating: shopData.rating,
+        reviewCount: shopData.reviewCount,
         dailySalesDelta: 0,
         capturedAt: new Date(),
       },
       status: 'active',
     });
 
-    // Create first snapshot
     await CompetitorSnapshot.create({
       watchId: watch._id,
       shopName: shopData.shopName,
       totalSales: shopData.totalSales,
       totalListings: shopData.totalListings,
       avgPrice: shopData.avgPrice,
+      rating: shopData.rating,
+      reviewCount: shopData.reviewCount,
       topListings: shopData.topListings,
     });
 
-    // Log SERP cost
     if (serpCalls > 0) {
       await SerpCostLog.create({
         userId: req.userId,
@@ -147,97 +168,60 @@ const addCompetitor = async (req, res) => {
       });
     }
 
-    return res.status(201).json({
-      success: true,
-      data: watch,
-    });
+    return res.status(201).json({ success: true, data: watch });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: 'You are already tracking this shop',
-      });
+      return res.status(409).json({ success: false, message: 'You are already tracking this shop' });
     }
     log.error('Add competitor error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to add competitor',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to add competitor' });
   }
 };
 
-/**
- * DELETE /api/v1/customer/competitors/watch/:id
- */
+/* ─── DELETE /watch/:id ─── */
+
 const removeCompetitor = async (req, res) => {
   try {
     const watch = await CompetitorWatch.findOneAndDelete({
       _id: req.params.id,
       userId: req.userId,
     });
-
     if (!watch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Competitor not found',
-      });
+      return res.status(404).json({ success: false, message: 'Competitor not found' });
     }
-
-    // Clean up snapshots
     await CompetitorSnapshot.deleteMany({ watchId: watch._id });
-
-    return res.json({
-      success: true,
-      message: 'Competitor removed from watch list',
-    });
+    return res.json({ success: true, message: 'Competitor removed from watch list' });
   } catch (error) {
     log.error('Remove competitor error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to remove competitor',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to remove competitor' });
   }
 };
 
-/**
- * GET /api/v1/customer/competitors/watch
- * Get all tracked competitors with latest snapshot data.
- */
+/* ─── GET /watch ─── */
+
 const getWatchList = async (req, res) => {
   try {
-    const competitors = await CompetitorWatch.find({ userId: req.userId })
-      .sort({ addedAt: -1 });
+    const watches = await CompetitorWatch.find({ userId: req.userId })
+      .sort({ addedAt: -1 })
+      .lean();
 
-    return res.json({
-      success: true,
-      data: competitors,
-    });
+    return res.json({ success: true, data: { watches } });
   } catch (error) {
     log.error('Get watch list error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve competitor list',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to retrieve competitor list' });
   }
 };
 
-/**
- * GET /api/v1/customer/competitors/:id/snapshot
- * Get snapshot history for a specific competitor.
- */
+/* ─── GET /:id/snapshots ─── */
+
 const getSnapshotHistory = async (req, res) => {
   try {
-    // Verify ownership
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
     });
-
     if (!watch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Competitor not found',
-      });
+      return res.status(404).json({ success: false, message: 'Competitor not found' });
     }
 
     const { page = 1, limit = 30 } = req.query;
@@ -247,7 +231,8 @@ const getSnapshotHistory = async (req, res) => {
       CompetitorSnapshot.find({ watchId: watch._id })
         .sort({ capturedAt: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(parseInt(limit))
+        .lean(),
       CompetitorSnapshot.countDocuments({ watchId: watch._id }),
     ]);
 
@@ -266,38 +251,28 @@ const getSnapshotHistory = async (req, res) => {
     });
   } catch (error) {
     log.error('Snapshot history error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve snapshot history',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to retrieve snapshot history' });
   }
 };
 
-/**
- * GET /api/v1/customer/competitors/:id/sales
- * Get sales data with daily deltas.
- */
+/* ─── GET /:id/sales ─── */
+
 const getSalesData = async (req, res) => {
   try {
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
     });
-
     if (!watch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Competitor not found',
-      });
+      return res.status(404).json({ success: false, message: 'Competitor not found' });
     }
 
-    // Get last 30 snapshots for trend
     const snapshots = await CompetitorSnapshot.find({ watchId: watch._id })
       .sort({ capturedAt: -1 })
       .limit(30)
-      .select('totalSales totalListings avgPrice capturedAt');
+      .select('totalSales totalListings avgPrice rating capturedAt')
+      .lean();
 
-    // Calculate daily deltas
     const salesTrend = [];
     for (let i = 0; i < snapshots.length - 1; i++) {
       salesTrend.push({
@@ -309,104 +284,151 @@ const getSalesData = async (req, res) => {
       });
     }
 
+    let trendPct = 0;
+    if (salesTrend.length >= 14) {
+      const recent7 = salesTrend.slice(0, 7).reduce((s, d) => s + d.dailyDelta, 0);
+      const prev7 = salesTrend.slice(7, 14).reduce((s, d) => s + d.dailyDelta, 0);
+      trendPct = prev7 > 0 ? Math.round((recent7 - prev7) / prev7 * 100) : 0;
+    }
+
+    const latestDelta = watch.latestSnapshot?.dailySalesDelta || 0;
+
     return res.json({
       success: true,
       data: {
         shopName: watch.shopName,
         currentSales: watch.latestSnapshot?.totalSales || 0,
-        dailySalesDelta: watch.latestSnapshot?.dailySalesDelta || 0,
+        dailySalesDelta: latestDelta,
+        avgPrice: watch.latestSnapshot?.avgPrice || 0,
+        estRevenue: Math.round(latestDelta * (watch.latestSnapshot?.avgPrice || 0) * 100) / 100,
+        trend: trendPct > 0 ? 'up' : trendPct < 0 ? 'down' : 'stable',
+        trendPct,
         salesTrend,
       },
     });
   } catch (error) {
     log.error('Sales data error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve sales data',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to retrieve sales data' });
   }
 };
 
-/**
- * POST /api/v1/customer/competitors/:id/refresh
- * Force-refresh competitor data.
- */
+/* ─── GET /sales/overview ─── */
+
+const salesOverview = async (req, res) => {
+  try {
+    const watches = await CompetitorWatch.find({ userId: req.userId, status: 'active' })
+      .sort({ addedAt: -1 })
+      .lean();
+
+    const rows = [];
+    for (const w of watches) {
+      const snaps = await CompetitorSnapshot.find({ watchId: w._id })
+        .sort({ capturedAt: -1 })
+        .limit(2)
+        .select('totalSales totalListings avgPrice rating capturedAt topListings')
+        .lean();
+
+      const latest = snaps[0] || {};
+      const prev = snaps[1] || {};
+      const delta = (latest.totalSales || 0) - (prev.totalSales || 0);
+      const avgP = w.latestSnapshot?.avgPrice || latest.avgPrice || 0;
+
+      let trendPct = 0;
+      const trendSnaps = await CompetitorSnapshot.find({ watchId: w._id })
+        .sort({ capturedAt: -1 })
+        .limit(14)
+        .select('totalSales')
+        .lean();
+
+      if (trendSnaps.length >= 14) {
+        let recent7 = 0, prev7 = 0;
+        for (let i = 0; i < 7; i++) recent7 += (trendSnaps[i].totalSales - (trendSnaps[i + 1]?.totalSales || trendSnaps[i].totalSales));
+        for (let i = 7; i < 13; i++) prev7 += (trendSnaps[i].totalSales - (trendSnaps[i + 1]?.totalSales || trendSnaps[i].totalSales));
+        trendPct = prev7 > 0 ? Math.round((recent7 - prev7) / prev7 * 100) : 0;
+      }
+
+      const topListing = (latest.topListings || [])[0] || null;
+
+      rows.push({
+        _id: w._id,
+        shopName: w.shopName,
+        iconUrl: w.iconUrl || '',
+        shopCountry: w.shopCountry || '',
+        totalSales: w.latestSnapshot?.totalSales || latest.totalSales || 0,
+        dailySales: delta,
+        avgPrice: avgP,
+        estRevenue: Math.round(delta * avgP * 100) / 100,
+        listings: w.latestSnapshot?.totalListings || latest.totalListings || 0,
+        rating: w.latestSnapshot?.rating || latest.rating || 0,
+        trend: trendPct > 0 ? 'up' : trendPct < 0 ? 'down' : 'stable',
+        trendPct,
+        topListing: topListing ? { title: topListing.title, price: topListing.price, favorites: topListing.favorites } : null,
+      });
+    }
+
+    const totalDailySales = rows.reduce((s, r) => s + r.dailySales, 0);
+    const totalEstRevenue = rows.reduce((s, r) => s + r.estRevenue, 0);
+    const topPerformer = rows.length ? rows.reduce((a, b) => a.dailySales > b.dailySales ? a : b) : null;
+
+    return res.json({
+      success: true,
+      data: {
+        shops: rows,
+        totalDailySales,
+        totalEstRevenue: Math.round(totalEstRevenue * 100) / 100,
+        topPerformer: topPerformer?.shopName || null,
+        shopCount: rows.length,
+      },
+    });
+  } catch (error) {
+    log.error('Sales overview error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to load sales overview' });
+  }
+};
+
+/* ─── POST /:id/refresh ─── */
+
 const refreshCompetitor = async (req, res) => {
   try {
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
     });
-
     if (!watch) {
-      return res.status(404).json({
-        success: false,
-        message: 'Competitor not found',
-      });
+      return res.status(404).json({ success: false, message: 'Competitor not found' });
     }
 
-    // Fetch fresh data
-    const shopResult = await etsyApi.publicRequest(
-      'GET',
-      `/v3/application/shops/${watch.etsyShopId || watch.shopName}`
-    );
-
-    if (!shopResult.success) {
+    const { shopData, serpCalls } = await fetchShopData(watch.etsyShopId || watch.shopName);
+    if (!shopData) {
       watch.status = 'error';
       watch.lastError = 'Could not fetch shop data';
       await watch.save();
-      return res.status(502).json({
-        success: false,
-        message: 'Failed to fetch competitor data from Etsy',
-      });
+      return res.status(502).json({ success: false, message: 'Failed to fetch competitor data from Etsy' });
     }
 
-    const shop = shopResult.data;
-
-    // Get top listings
-    const listingsResult = await etsyApi.publicRequest(
-      'GET',
-      `/v3/application/shops/${shop.shop_id}/listings`,
-      { params: { limit: 10, sort_on: 'score' } }
-    );
-
-    const topListings = (listingsResult.success ? listingsResult.data.results : [])
-      .map(l => ({
-        listingId: String(l.listing_id),
-        title: l.title || '',
-        price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
-        views: l.views || 0,
-        favorites: l.num_favorers || 0,
-        tags: l.tags || [],
-      }));
-
-    const avgPrice = topListings.length > 0
-      ? Math.round(topListings.reduce((s, l) => s + l.price, 0) / topListings.length * 100) / 100
-      : 0;
-
-    // Calculate daily delta from previous snapshot
-    const prevSnapshot = await CompetitorSnapshot.findOne({ watchId: watch._id })
+    const prevSnap = await CompetitorSnapshot.findOne({ watchId: watch._id })
       .sort({ capturedAt: -1 });
+    const dailyDelta = prevSnap ? shopData.totalSales - prevSnap.totalSales : 0;
 
-    const dailyDelta = prevSnapshot
-      ? (shop.transaction_sold_count || 0) - prevSnapshot.totalSales
-      : 0;
-
-    // Create snapshot
     await CompetitorSnapshot.create({
       watchId: watch._id,
-      shopName: shop.shop_name,
-      totalSales: shop.transaction_sold_count || 0,
-      totalListings: shop.listing_active_count || 0,
-      avgPrice,
-      topListings,
+      shopName: shopData.shopName,
+      totalSales: shopData.totalSales,
+      totalListings: shopData.totalListings,
+      avgPrice: shopData.avgPrice,
+      rating: shopData.rating,
+      reviewCount: shopData.reviewCount,
+      topListings: shopData.topListings,
     });
 
-    // Update watch with latest data
+    watch.shopCountry = shopData.shopCountry;
+    watch.iconUrl = shopData.iconUrl;
     watch.latestSnapshot = {
-      totalSales: shop.transaction_sold_count || 0,
-      totalListings: shop.listing_active_count || 0,
-      avgPrice,
+      totalSales: shopData.totalSales,
+      totalListings: shopData.totalListings,
+      avgPrice: shopData.avgPrice,
+      rating: shopData.rating,
+      reviewCount: shopData.reviewCount,
       dailySalesDelta: dailyDelta,
       capturedAt: new Date(),
     };
@@ -414,32 +436,91 @@ const refreshCompetitor = async (req, res) => {
     watch.lastError = null;
     await watch.save();
 
-    // Log SERP cost (2 calls: shop + listings)
     await SerpCostLog.create({
       userId: req.userId,
       featureKey: 'competitor_tracking',
       action: `refresh_competitor:${watch.shopName}`,
-      requestCount: 2,
-      costUsd: 2 * SERP_COST_PER_REQ,
+      requestCount: serpCalls,
+      costUsd: serpCalls * SERP_COST_PER_REQ,
       cacheHit: false,
     });
 
-    return res.json({
-      success: true,
-      data: watch,
-    });
+    return res.json({ success: true, data: watch });
   } catch (error) {
     log.error('Refresh competitor error:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to refresh competitor data',
-    });
+    return res.status(500).json({ success: false, message: 'Failed to refresh competitor data' });
   }
 };
 
-function hashKey(str) {
-  return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
-}
+/* ─── POST /refresh-all ─── */
+
+const refreshAll = async (req, res) => {
+  try {
+    const watches = await CompetitorWatch.find({ userId: req.userId, status: 'active' });
+    let refreshed = 0, failed = 0, totalCalls = 0;
+
+    for (const watch of watches) {
+      try {
+        const { shopData, serpCalls } = await fetchShopData(watch.etsyShopId || watch.shopName);
+        totalCalls += serpCalls;
+
+        if (!shopData) { failed++; continue; }
+
+        const prevSnap = await CompetitorSnapshot.findOne({ watchId: watch._id })
+          .sort({ capturedAt: -1 });
+        const dailyDelta = prevSnap ? shopData.totalSales - prevSnap.totalSales : 0;
+
+        await CompetitorSnapshot.create({
+          watchId: watch._id,
+          shopName: shopData.shopName,
+          totalSales: shopData.totalSales,
+          totalListings: shopData.totalListings,
+          avgPrice: shopData.avgPrice,
+          rating: shopData.rating,
+          reviewCount: shopData.reviewCount,
+          topListings: shopData.topListings,
+        });
+
+        watch.shopCountry = shopData.shopCountry;
+        watch.iconUrl = shopData.iconUrl;
+        watch.latestSnapshot = {
+          totalSales: shopData.totalSales,
+          totalListings: shopData.totalListings,
+          avgPrice: shopData.avgPrice,
+          rating: shopData.rating,
+          reviewCount: shopData.reviewCount,
+          dailySalesDelta: dailyDelta,
+          capturedAt: new Date(),
+        };
+        watch.status = 'active';
+        watch.lastError = null;
+        await watch.save();
+        refreshed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    if (totalCalls > 0) {
+      await SerpCostLog.create({
+        userId: req.userId,
+        featureKey: 'competitor_tracking',
+        action: 'refresh_all',
+        requestCount: totalCalls,
+        costUsd: totalCalls * SERP_COST_PER_REQ,
+        cacheHit: false,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: { refreshed, failed, total: watches.length },
+    });
+  } catch (error) {
+    log.error('Refresh all error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to refresh competitors' });
+  }
+};
 
 module.exports = {
   addCompetitor,
@@ -448,4 +529,6 @@ module.exports = {
   getSnapshotHistory,
   getSalesData,
   refreshCompetitor,
+  refreshAll,
+  salesOverview,
 };

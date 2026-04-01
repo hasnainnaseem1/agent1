@@ -23,6 +23,14 @@ const competitorSnapshotSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  rating: {
+    type: Number,
+    default: 0,
+  },
+  reviewCount: {
+    type: Number,
+    default: 0,
+  },
   // Top listings for gap analysis
   topListings: [{
     listingId: { type: String },

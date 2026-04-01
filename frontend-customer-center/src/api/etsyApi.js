@@ -43,12 +43,14 @@ const etsyApi = {
   getTagHistory:   (params = {}) => axiosInstance.get('/api/v1/customer/tag-analyzer/history', { params }).then(r => r.data),
 
   // Competitors
-  addCompetitor:      (data) => axiosInstance.post('/api/v1/customer/competitors/watch', data).then(r => r.data),
-  removeCompetitor:   (id)   => axiosInstance.delete(`/api/v1/customer/competitors/watch/${id}`).then(r => r.data),
-  getWatchList:       () => axiosInstance.get('/api/v1/customer/competitors/watch').then(r => r.data),
-  getSnapshots:       (id, params = {}) => axiosInstance.get(`/api/v1/customer/competitors/${id}/snapshots`, { params }).then(r => r.data),
-  getCompetitorSales: (id) => axiosInstance.get(`/api/v1/customer/competitors/${id}/sales`).then(r => r.data),
-  refreshCompetitor:  (id) => axiosInstance.post(`/api/v1/customer/competitors/${id}/refresh`).then(r => r.data),
+  addCompetitor:           (data) => axiosInstance.post('/api/v1/customer/competitors/watch', data).then(r => r.data),
+  removeCompetitor:        (id)   => axiosInstance.delete(`/api/v1/customer/competitors/watch/${id}`).then(r => r.data),
+  getWatchList:            () => axiosInstance.get('/api/v1/customer/competitors/watch').then(r => r.data),
+  getSnapshots:            (id, params = {}) => axiosInstance.get(`/api/v1/customer/competitors/${id}/snapshots`, { params }).then(r => r.data),
+  getCompetitorSales:      (id) => axiosInstance.get(`/api/v1/customer/competitors/${id}/sales`).then(r => r.data),
+  refreshCompetitor:       (id) => axiosInstance.post(`/api/v1/customer/competitors/${id}/refresh`).then(r => r.data),
+  refreshAllCompetitors:   () => axiosInstance.post('/api/v1/customer/competitors/refresh-all').then(r => r.data),
+  getSalesOverview:        () => axiosInstance.get('/api/v1/customer/competitors/sales/overview').then(r => r.data),
 
   // Logistics
   getDeliveryStatus:  (params = {}) => axiosInstance.get('/api/v1/customer/logistics/delivery-status', { params }).then(r => r.data),

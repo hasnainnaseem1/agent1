@@ -33,6 +33,27 @@ router.get('/watch',
   competitorController.getWatchList
 );
 
+// @route   POST /api/v1/customer/competitors/refresh-all
+// @desc    Refresh all competitors at once
+// @access  Private — needs subscription + Etsy shop + competitor_tracking
+router.post('/refresh-all',
+  checkSubscription,
+  checkShopConnection,
+  checkFeatureAccess('competitor_tracking'),
+  competitorController.refreshAll
+);
+
+// @route   GET /api/v1/customer/competitors/sales/overview
+// @desc    Aggregated sales overview for all tracked shops
+// @access  Private — needs subscription + Etsy shop + competitor_sales
+router.get('/sales/overview',
+  checkSubscription,
+  checkShopConnection,
+  checkFeatureAccess('competitor_sales'),
+  trackFeatureUsage('competitor_sales'),
+  competitorController.salesOverview
+);
+
 // @route   GET /api/v1/customer/competitors/:id/snapshots
 // @desc    Get snapshot history for a specific competitor
 // @access  Private — needs Etsy shop connection

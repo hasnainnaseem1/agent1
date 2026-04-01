@@ -1,6 +1,6 @@
 /**
  * Competitor Sync Job
- * 
+ *
  * Daily refresh of all active competitor watches.
  * Captures a new snapshot for each watched competitor shop.
  */
@@ -17,8 +17,10 @@ const run = async () => {
 
   for (const watch of watches) {
     try {
-      // Fetch shop data from Etsy public API
-      const shopRes = await etsyApi.publicRequest(`/shops/${watch.etsyShopId}`);
+      const shopRes = await etsyApi.publicRequest(
+        'GET',
+        `/v3/application/shops/${watch.etsyShopId}`
+      );
       if (!shopRes.success) {
         failed++;
         continue;
@@ -26,38 +28,53 @@ const run = async () => {
 
       const shop = shopRes.data;
 
-      // Fetch top active listings
       const listingsRes = await etsyApi.publicRequest(
-        `/shops/${watch.etsyShopId}/listings/active?limit=25&sort_on=score`
+        'GET',
+        `/v3/application/shops/${watch.etsyShopId}/listings/active`,
+        { params: { limit: 25, sort_on: 'score' } }
       );
 
       const topListings = (listingsRes.success && listingsRes.data?.results)
         ? listingsRes.data.results.slice(0, 10).map(l => ({
-            etsyListingId: String(l.listing_id),
+            listingId: String(l.listing_id),
             title: l.title,
             price: l.price?.amount ? l.price.amount / l.price.divisor : 0,
+            views: l.views || 0,
+            favorites: l.num_favorers || 0,
             tags: l.tags || [],
           }))
         : [];
 
-      // Create snapshot
+      const avgPrice = topListings.length
+        ? Math.round(topListings.reduce((sum, l) => sum + l.price, 0) / topListings.length * 100) / 100
+        : 0;
+
+      // Get previous snapshot to calculate daily delta
+      const prevSnap = await CompetitorSnapshot.findOne({ watchId: watch._id })
+        .sort({ capturedAt: -1 });
+      const dailyDelta = prevSnap ? (shop.transaction_sold_count || 0) - prevSnap.totalSales : 0;
+
       const snapshot = await CompetitorSnapshot.create({
         watchId: watch._id,
         shopName: watch.shopName,
         totalSales: shop.transaction_sold_count || 0,
         totalListings: shop.listing_active_count || 0,
-        avgPrice: topListings.length
-          ? topListings.reduce((sum, l) => sum + l.price, 0) / topListings.length
-          : 0,
+        avgPrice,
+        rating: shop.review_average || 0,
+        reviewCount: shop.review_count || 0,
         topListings,
       });
 
-      // Update denormalized latest snapshot
       await CompetitorWatch.findByIdAndUpdate(watch._id, {
+        shopCountry: shop.shipping_from_country_iso || shop.shop_location_country_iso || '',
+        iconUrl: shop.icon_url_fullxfull || '',
         latestSnapshot: {
           totalSales: snapshot.totalSales,
           totalListings: snapshot.totalListings,
           avgPrice: snapshot.avgPrice,
+          rating: shop.review_average || 0,
+          reviewCount: shop.review_count || 0,
+          dailySalesDelta: dailyDelta,
           capturedAt: snapshot.capturedAt,
         },
       });
