@@ -3,7 +3,7 @@ import axiosInstance from './axiosInstance';
 const analysisApi = {
   /** Run a new listing audit */
   analyze: (data) =>
-    axiosInstance.post('/api/v1/customer/analysis/analyze', data).then(r => r.data),
+    axiosInstance.post('/api/v1/customer/analysis', data).then(r => r.data),
 
   /** Get analysis history (paginated) */
   getHistory: (params = {}) =>
