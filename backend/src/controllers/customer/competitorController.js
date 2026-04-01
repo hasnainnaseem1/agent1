@@ -213,6 +213,7 @@ const removeCompetitor = async (req, res) => {
     const watch = await CompetitorWatch.findOneAndDelete({
       _id: req.params.id,
       userId: req.userId,
+      shopId: req.etsyShop._id,
     });
     if (!watch) {
       return res.status(404).json({ success: false, message: 'Competitor not found' });
@@ -229,7 +230,7 @@ const removeCompetitor = async (req, res) => {
 
 const getWatchList = async (req, res) => {
   try {
-    const watches = await CompetitorWatch.find({ userId: req.userId })
+const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id })
       .sort({ addedAt: -1 })
       .lean();
 
@@ -247,6 +248,7 @@ const getSnapshotHistory = async (req, res) => {
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
+      shopId: req.etsyShop._id,
     });
     if (!watch) {
       return res.status(404).json({ success: false, message: 'Competitor not found' });
@@ -290,6 +292,7 @@ const getSalesData = async (req, res) => {
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
+      shopId: req.etsyShop._id,
     });
     if (!watch) {
       return res.status(404).json({ success: false, message: 'Competitor not found' });
@@ -344,7 +347,7 @@ const getSalesData = async (req, res) => {
 
 const salesOverview = async (req, res) => {
   try {
-    const watches = await CompetitorWatch.find({ userId: req.userId, status: 'active' })
+const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id, status: 'active' })
       .sort({ addedAt: -1 })
       .lean();
 
@@ -421,6 +424,7 @@ const refreshCompetitor = async (req, res) => {
     const watch = await CompetitorWatch.findOne({
       _id: req.params.id,
       userId: req.userId,
+      shopId: req.etsyShop._id,
     });
     if (!watch) {
       return res.status(404).json({ success: false, message: 'Competitor not found' });
@@ -484,7 +488,7 @@ const refreshCompetitor = async (req, res) => {
 
 const refreshAll = async (req, res) => {
   try {
-    const watches = await CompetitorWatch.find({ userId: req.userId, status: 'active' });
+      const watches = await CompetitorWatch.find({ userId: req.userId, shopId: req.etsyShop._id, status: 'active' });
     let refreshed = 0, failed = 0, totalCalls = 0;
 
     for (const watch of watches) {

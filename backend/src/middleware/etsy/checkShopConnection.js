@@ -36,8 +36,8 @@ const checkShopConnection = async (req, res, next) => {
       });
     }
 
-    // Check for shopId in params, query, or body (for multi-shop targeting)
-    const shopId = req.params.shopId || req.query.shopId || req.body?.shopId;
+    // Check for shopId in header, params, query, or body (for multi-shop targeting)
+    const shopId = req.headers['x-shop-id'] || req.params.shopId || req.query.shopId || req.body?.shopId;
 
     let shop;
 

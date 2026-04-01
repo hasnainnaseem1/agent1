@@ -7,11 +7,16 @@ const axiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Request interceptor — inject auth token
+// Request interceptor — inject auth token + active shop
 axiosInstance.interceptors.request.use(
   (cfg) => {
     const token = localStorage.getItem('token');
     if (token) cfg.headers.Authorization = `Bearer ${token}`;
+
+    // Multi-shop: send selected shop ID so backend targets the correct shop
+    const shopId = localStorage.getItem('sellsera_active_shop');
+    if (shopId) cfg.headers['X-Shop-Id'] = shopId;
+
     return cfg;
   },
   (error) => Promise.reject(error)

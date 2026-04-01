@@ -78,7 +78,7 @@ const checkRankings = async (req, res) => {
     let totalSerpCalls = 0;
 
     // Check for previous rank data (for change calculation)
-    const previousCheck = await RankCheck.findOne({ userId: req.userId })
+    const previousCheck = await RankCheck.findOne({ userId: req.userId, shopId: req.etsyShop?._id })
       .sort({ checkedAt: -1 })
       .select('results')
       .lean();
@@ -160,6 +160,7 @@ const checkRankings = async (req, res) => {
     // Save to DB
     const rankCheck = await RankCheck.create({
       userId: req.userId,
+      shopId: req.etsyShop?._id || null,
       etsyListingId: targetListingId || 'shop',
       listingTitle: listingTitle || '',
       country,
@@ -205,12 +206,12 @@ const getRankHistory = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const [checks, total] = await Promise.all([
-      RankCheck.find({ userId: req.userId })
+      RankCheck.find({ userId: req.userId, shopId: req.etsyShop?._id })
         .sort({ checkedAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
         .select('etsyListingId listingTitle keywordCount results checkedAt country'),
-      RankCheck.countDocuments({ userId: req.userId }),
+      RankCheck.countDocuments({ userId: req.userId, shopId: req.etsyShop?._id }),
     ]);
 
     return res.json({
@@ -251,6 +252,7 @@ const getRankTrend = async (req, res) => {
     }
 
     const query = { userId: req.userId, 'results.keyword': keyword.trim() };
+    if (req.etsyShop?._id) query.shopId = req.etsyShop._id;
     if (etsyListingId) query.etsyListingId = etsyListingId;
 
     const checks = await RankCheck.find(query)

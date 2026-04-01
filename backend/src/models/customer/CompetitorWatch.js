@@ -7,6 +7,12 @@ const competitorWatchSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  shopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EtsyShop',
+    default: null,
+    index: true,
+  },
   shopName: {
     type: String,
     required: [true, 'Competitor shop name is required'],
@@ -48,7 +54,7 @@ const competitorWatchSchema = new mongoose.Schema({
   },
 });
 
-competitorWatchSchema.index({ userId: 1, shopName: 1 }, { unique: true });
+competitorWatchSchema.index({ userId: 1, shopId: 1, shopName: 1 }, { unique: true });
 competitorWatchSchema.index({ status: 1 });
 
 competitorWatchSchema.pre('save', function (next) {

@@ -7,6 +7,12 @@ const rankCheckSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+  shopId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EtsyShop',
+    default: null,
+    index: true,
+  },
   // The listing being checked
   etsyListingId: {
     type: String,
@@ -46,9 +52,9 @@ const rankCheckSchema = new mongoose.Schema({
   },
 });
 
-rankCheckSchema.index({ userId: 1, checkedAt: -1 });
-rankCheckSchema.index({ userId: 1, etsyListingId: 1, checkedAt: -1 });
-rankCheckSchema.index({ userId: 1, country: 1, checkedAt: -1 });
+rankCheckSchema.index({ userId: 1, shopId: 1, checkedAt: -1 });
+rankCheckSchema.index({ userId: 1, shopId: 1, etsyListingId: 1, checkedAt: -1 });
+rankCheckSchema.index({ userId: 1, shopId: 1, country: 1, checkedAt: -1 });
 
 const RankCheck = mongoose.model('RankCheck', rankCheckSchema);
 module.exports = RankCheck;

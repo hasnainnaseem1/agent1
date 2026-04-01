@@ -54,6 +54,17 @@ const startServer = async () => {
   // Connect to database first
   await connectDB();
 
+  // One-time index migrations (safe to re-run — no-ops if already done)
+  try {
+    const db = mongoose.connection.db;
+    const cwIndexes = await db.collection('competitorwatches').indexes();
+    const oldIdx = cwIndexes.find(i => i.key?.userId && i.key?.shopName && !i.key?.shopId && i.unique);
+    if (oldIdx) {
+      await db.collection('competitorwatches').dropIndex(oldIdx.name);
+      log.info('Dropped old CompetitorWatch unique index (userId+shopName) — replaced with userId+shopId+shopName');
+    }
+  } catch (e) { /* collection may not exist yet — ignore */ }
+
   // Load encryption key from DB (falls back to env var)
   await initEncryptionKey();
   
