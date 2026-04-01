@@ -423,8 +423,13 @@ function getTrendingLimit(planName) {
 
 const getTrendingKeywords = async (req, res) => {
   try {
-    const { category, limit = 30 } = req.query;
+    const { category, limit = 30, country } = req.query;
     const maxLimit = Math.min(parseInt(limit) || 30, 100);
+
+    // Sanitize country: accept 2-letter ISO codes, default null (global)
+    const requestedCountry = (country && /^[A-Za-z]{2}$/.test(country))
+      ? country.toUpperCase()
+      : null;
 
     // Build keyword filter based on category
     let keywordFilter = {};
@@ -441,36 +446,58 @@ const getTrendingKeywords = async (req, res) => {
     if (!latestSnapshot) {
       return res.json({
         success: true,
-        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: null },
+        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: null, country: requestedCountry },
       });
     }
 
     const latestDate = latestSnapshot.snapshotDate;
 
-    // Get latest snapshots with fusion scores
-    const latest = await KeywordSnapshot.find({
-      ...keywordFilter,
-      snapshotDate: latestDate,
-      fusionScore: { $ne: null },
-    })
-      .sort({ fusionScore: -1 })
-      .limit(maxLimit * 3) // fetch extra to compute WoW
-      .select('keyword totalResults avgViews avgFavorites competitionPct fusionScore googleTrends freshness velocity snapshotDate')
-      .lean();
+    // Try country-specific snapshots first, fallback to global (null)
+    let resolvedCountry = requestedCountry;
+    let latest = [];
+
+    if (requestedCountry) {
+      latest = await KeywordSnapshot.find({
+        ...keywordFilter,
+        snapshotDate: latestDate,
+        country: requestedCountry,
+        fusionScore: { $ne: null },
+      })
+        .sort({ fusionScore: -1 })
+        .limit(maxLimit * 3)
+        .select('keyword totalResults avgViews avgFavorites competitionPct fusionScore googleTrends freshness velocity snapshotDate country')
+        .lean();
+    }
+
+    // Fallback to global if no country-specific data
+    if (!latest.length) {
+      resolvedCountry = null;
+      latest = await KeywordSnapshot.find({
+        ...keywordFilter,
+        snapshotDate: latestDate,
+        country: null,
+        fusionScore: { $ne: null },
+      })
+        .sort({ fusionScore: -1 })
+        .limit(maxLimit * 3)
+        .select('keyword totalResults avgViews avgFavorites competitionPct fusionScore googleTrends freshness velocity snapshotDate country')
+        .lean();
+    }
 
     if (!latest.length) {
       return res.json({
         success: true,
-        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: latestDate },
+        data: { trending: [], categories: Object.keys(seedKeywordCategories), lastUpdated: latestDate, country: resolvedCountry },
       });
     }
 
-    // Get previous snapshots for WoW comparison
+    // Get previous snapshots for WoW comparison (same country scope)
     const prevDate = new Date(latestDate);
     prevDate.setDate(prevDate.getDate() - 7);
 
     const prevSnapshots = await KeywordSnapshot.find({
       keyword: { $in: latest.map(s => s.keyword) },
+      country: resolvedCountry,
       snapshotDate: { $gte: prevDate, $lt: latestDate },
     })
       .select('keyword fusionScore totalResults')
@@ -585,6 +612,9 @@ const getTrendingKeywords = async (req, res) => {
         plan: resolvedPlan,
         visibleLimit: visible,
         totalLimit: total,
+        country: resolvedCountry,
+        requestedCountry: requestedCountry,
+        isFallback: requestedCountry !== null && resolvedCountry === null,
       },
     });
   } catch (error) {

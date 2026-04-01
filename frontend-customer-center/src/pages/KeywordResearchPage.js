@@ -70,15 +70,20 @@ const KeywordResearchPage = () => {
         if (res.success && res.data?.length) setCountries(res.data);
       })
       .catch(() => {});
-    // Load trending keywords on mount
-    fetchTrending('all');
   }, []);
 
-  const fetchTrending = async (category) => {
+  // Fetch trending keywords whenever the selected country or category changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    fetchTrending(selectedCategory, country);
+  }, [country, selectedCategory]);
+
+  const fetchTrending = async (category, countryCode) => {
     setTrendingLoading(true);
     try {
       const params = { limit: 30 };
       if (category && category !== 'all') params.category = category;
+      if (countryCode) params.country = countryCode;
       const res = await etsyApi.getTrendingKeywords(params);
       if (res.success) {
         setTrending(res.data?.trending || []);
@@ -98,7 +103,6 @@ const KeywordResearchPage = () => {
 
   const handleCategoryChange = (val) => {
     setSelectedCategory(val);
-    fetchTrending(val);
   };
 
   const card = {
