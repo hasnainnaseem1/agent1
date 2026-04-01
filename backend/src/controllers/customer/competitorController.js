@@ -33,18 +33,46 @@ function hashKey(str) {
  */
 async function fetchShopData(shopNameOrId) {
   let serpCalls = 0;
+  let shop = null;
 
-  const shopResult = await etsyApi.publicRequest(
-    'GET',
-    `/v3/application/shops/${shopNameOrId}`
-  );
-  serpCalls++;
+  // If it's a numeric ID, fetch directly; otherwise search by name
+  const isNumericId = /^\d+$/.test(String(shopNameOrId));
 
-  if (!shopResult.success) {
-    return { shopData: null, serpCalls };
+  if (isNumericId) {
+    const shopResult = await etsyApi.publicRequest(
+      'GET',
+      `/v3/application/shops/${shopNameOrId}`
+    );
+    serpCalls++;
+    if (!shopResult.success) return { shopData: null, serpCalls };
+    shop = shopResult.data;
+  } else {
+    // Etsy v3 requires numeric shop_id in path — use findShops endpoint for name lookup
+    const searchResult = await etsyApi.publicRequest(
+      'GET',
+      '/v3/application/shops',
+      { params: { shop_name: shopNameOrId } }
+    );
+    serpCalls++;
+
+    if (!searchResult.success || !searchResult.data?.results?.length) {
+      return { shopData: null, serpCalls };
+    }
+
+    // Find exact match (case-insensitive)
+    const match = searchResult.data.results.find(
+      s => s.shop_name.toLowerCase() === shopNameOrId.toLowerCase()
+    ) || searchResult.data.results[0];
+
+    // Fetch full shop details using numeric ID
+    const shopResult = await etsyApi.publicRequest(
+      'GET',
+      `/v3/application/shops/${match.shop_id}`
+    );
+    serpCalls++;
+    if (!shopResult.success) return { shopData: null, serpCalls };
+    shop = shopResult.data;
   }
-
-  const shop = shopResult.data;
 
   const listingsResult = await etsyApi.publicRequest(
     'GET',
