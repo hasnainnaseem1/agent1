@@ -157,7 +157,7 @@ const CompetitorTrackerPage = () => {
 
   /* ─── Expandable row – top listings ─── */
 
-  const expandedRowRender = (record) => {
+  const ExpandedRow = ({ record }) => {
     const [snaps, setSnaps] = useState([]);
     const [snapLoading, setSnapLoading] = useState(true);
 
@@ -502,7 +502,7 @@ const CompetitorTrackerPage = () => {
               size="middle"
               loading={fetchLoading}
               expandable={{
-                expandedRowRender,
+                expandedRowRender: (record) => <ExpandedRow record={record} />,
                 expandRowByClick: true,
               }}
               scroll={{ x: 900 }}
