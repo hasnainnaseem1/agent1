@@ -23,4 +23,12 @@ router.get('/history',
   rankCheckerController.getRankHistory
 );
 
+// @route   GET /api/v1/customer/rank-checker/trend
+// @desc    Get rank trend for a specific keyword over time
+// @access  Private
+router.get('/trend',
+  checkSubscription,
+  rankCheckerController.getRankTrend
+);
+
 module.exports = router;

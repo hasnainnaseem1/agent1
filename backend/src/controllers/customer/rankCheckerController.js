@@ -16,6 +16,8 @@ const { SerpCostLog } = require('../../models/customer');
 const { EtsyListing } = require('../../models/integrations');
 const etsyApi = require('../../services/etsy/etsyApiService');
 const redis = require('../../services/cache/redisService');
+const { CODE_TO_LOCATION } = require('../../utils/constants/etsyCountries');
+const { isPlanAllowed } = require('../../utils/constants/countryTiers');
 const crypto = require('crypto');
 const log = require('../../utils/logger')('RankChecker');
 
@@ -29,7 +31,8 @@ const PAGES_TO_SCAN = 3; // 3 pages × 48 results = 144 positions
  */
 const checkRankings = async (req, res) => {
   try {
-    let { etsyListingId, keywords, listingTitle } = req.body;
+    let { etsyListingId, keywords, listingTitle, country } = req.body;
+    country = (country || 'US').toUpperCase().trim();
 
     if (!keywords || !Array.isArray(keywords) || keywords.length === 0) {
       return res.status(400).json({
@@ -38,10 +41,27 @@ const checkRankings = async (req, res) => {
       });
     }
 
+    // Plan-tier country gating
+    const planName = req.user?.planSnapshot?.planName || 'free';
+    if (!isPlanAllowed(planName, country)) {
+      return res.status(403).json({
+        success: false,
+        errorCode: 'UPGRADE_REQUIRED',
+        message: `Your current plan does not include access to the ${country} market. Please upgrade.`,
+      });
+    }
+
     const keywordList = keywords
       .map(k => (typeof k === 'string' ? k.trim() : ''))
       .filter(k => k.length > 0)
       .slice(0, 50);
+
+    // Build search params with country support
+    const baseSearchParams = { limit: 48, sort_on: 'score' };
+    if (country && country !== 'GLOBAL') {
+      const loc = CODE_TO_LOCATION[country] || country;
+      baseSearchParams.shop_location = loc;
+    }
 
     // If no specific listing, get all user's listings for matching
     let shopListingIds = [];
@@ -72,7 +92,7 @@ const checkRankings = async (req, res) => {
     }
 
     for (const keyword of keywordList) {
-      const cacheKey = `rank:${targetListingId || 'shop'}:${hashKey(keyword)}`;
+      const cacheKey = `rank:${targetListingId || 'shop'}:${country}:${hashKey(keyword)}`;
       let rankData = await redis.get(cacheKey);
 
       if (rankData) {
@@ -94,7 +114,7 @@ const checkRankings = async (req, res) => {
         const searchResult = await etsyApi.publicRequest(
           'GET',
           '/v3/application/listings/active',
-          { params: { keywords: keyword, limit: 48, offset: p * 48, sort_on: 'score' } }
+          { params: { ...baseSearchParams, keywords: keyword, offset: p * 48 } }
         );
         totalSerpCalls++;
 
@@ -142,6 +162,7 @@ const checkRankings = async (req, res) => {
       userId: req.userId,
       etsyListingId: targetListingId || 'shop',
       listingTitle: listingTitle || '',
+      country,
       results,
       keywordCount: keywordList.length,
       serpCallCount: totalSerpCalls,
@@ -188,7 +209,7 @@ const getRankHistory = async (req, res) => {
         .sort({ checkedAt: -1 })
         .skip(skip)
         .limit(parseInt(limit))
-        .select('etsyListingId listingTitle keywordCount results checkedAt'),
+        .select('etsyListingId listingTitle keywordCount results checkedAt country'),
       RankCheck.countDocuments({ userId: req.userId }),
     ]);
 
@@ -217,4 +238,48 @@ function hashKey(str) {
   return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
 }
 
-module.exports = { checkRankings, getRankHistory };
+/**
+ * GET /api/v1/customer/rank-checker/trend
+ * Returns rank history for a specific keyword over time.
+ * Query params: keyword (required), etsyListingId (optional)
+ */
+const getRankTrend = async (req, res) => {
+  try {
+    const { keyword, etsyListingId } = req.query;
+    if (!keyword) {
+      return res.status(400).json({ success: false, message: 'keyword query param is required' });
+    }
+
+    const query = { userId: req.userId, 'results.keyword': keyword.trim() };
+    if (etsyListingId) query.etsyListingId = etsyListingId;
+
+    const checks = await RankCheck.find(query)
+      .sort({ checkedAt: -1 })
+      .limit(30)
+      .select('results checkedAt country')
+      .lean();
+
+    const trend = checks
+      .map(c => {
+        const match = c.results.find(r => r.keyword.toLowerCase() === keyword.trim().toLowerCase());
+        if (!match) return null;
+        return {
+          date: c.checkedAt,
+          rank: match.rank,
+          page: match.page,
+          found: match.found,
+          change: match.change || 0,
+          country: c.country || 'US',
+        };
+      })
+      .filter(Boolean)
+      .reverse(); // oldest first for charting
+
+    return res.json({ success: true, data: { keyword: keyword.trim(), trend } });
+  } catch (error) {
+    log.error('Rank trend error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve rank trend' });
+  }
+};
+
+module.exports = { checkRankings, getRankHistory, getRankTrend };

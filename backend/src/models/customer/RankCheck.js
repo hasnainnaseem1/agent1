@@ -16,6 +16,11 @@ const rankCheckSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // Country/market the check was performed against
+  country: {
+    type: String,
+    default: 'US',
+  },
   // Results per keyword
   results: [{
     keyword: { type: String, required: true },
@@ -23,6 +28,8 @@ const rankCheckSchema = new mongoose.Schema({
     page: { type: Number, default: null },
     totalResults: { type: Number, default: 0 },
     found: { type: Boolean, default: false },
+    change: { type: Number, default: 0 },
+    trend: { type: String, enum: ['up', 'down', 'stable'], default: 'stable' },
   }],
   keywordCount: {
     type: Number,
@@ -41,6 +48,7 @@ const rankCheckSchema = new mongoose.Schema({
 
 rankCheckSchema.index({ userId: 1, checkedAt: -1 });
 rankCheckSchema.index({ userId: 1, etsyListingId: 1, checkedAt: -1 });
+rankCheckSchema.index({ userId: 1, country: 1, checkedAt: -1 });
 
 const RankCheck = mongoose.model('RankCheck', rankCheckSchema);
 module.exports = RankCheck;

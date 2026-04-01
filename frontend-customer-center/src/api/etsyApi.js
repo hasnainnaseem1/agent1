@@ -35,6 +35,7 @@ const etsyApi = {
   // Rank checker
   checkRankings:   (data) => axiosInstance.post('/api/v1/customer/rank-checker', data).then(r => r.data),
   getRankHistory:  (params = {}) => axiosInstance.get('/api/v1/customer/rank-checker/history', { params }).then(r => r.data),
+  getRankTrend:    (params = {}) => axiosInstance.get('/api/v1/customer/rank-checker/trend', { params }).then(r => r.data),
 
   // Tag analyzer
   analyzeTags:     (data) => axiosInstance.post('/api/v1/customer/tag-analyzer', data).then(r => r.data),
