@@ -175,9 +175,10 @@ const BulkRankCheckerPage = () => {
   };
 
   // ── Stats ──
-  const avgRank = results.length ? Math.round(results.reduce((s, r) => s + r.rank, 0) / results.length) : 0;
-  const page1Count = results.filter(r => r.page === 1).length;
   const foundCount = results.filter(r => r.found).length;
+  const rankedResults = results.filter(r => r.found && r.rank > 0);
+  const avgRank = rankedResults.length ? Math.round(rankedResults.reduce((s, r) => s + r.rank, 0) / rankedResults.length) : null;
+  const page1Count = results.filter(r => r.found && r.page === 1).length;
 
   // ── Results Table Columns ──
   const columns = [
@@ -256,7 +257,8 @@ const BulkRankCheckerPage = () => {
   ];
 
   // ── Trend chart ──
-  const maxRank = trendData.length ? Math.max(...trendData.map(t => t.rank || 0), 1) : 1;
+  const foundTrends = trendData.filter(t => t.found && t.rank);
+  const maxRank = foundTrends.length ? Math.max(...foundTrends.map(t => t.rank), 1) : 144;
 
   // ── Country Select options ──
   const countryOptions = (() => {
@@ -393,28 +395,46 @@ const BulkRankCheckerPage = () => {
 
         {/* ── Stat Cards ── */}
         {results.length > 0 && (
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-            <Col xs={12} sm={6}>
-              <Card style={card}>
-                <Statistic title="Keywords Checked" value={results.length} valueStyle={{ color: BRAND, fontWeight: 700 }} />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card style={card}>
-                <Statistic title="Found / Ranked" value={foundCount} suffix={`/ ${results.length}`} valueStyle={{ color: colors.success, fontWeight: 700 }} />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card style={card}>
-                <Statistic title="Avg Rank" value={avgRank} prefix="#" valueStyle={{ fontWeight: 700 }} />
-              </Card>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Card style={card}>
-                <Statistic title="On Page 1" value={page1Count} suffix={`/ ${results.length}`} valueStyle={{ color: colors.success, fontWeight: 700 }} />
-              </Card>
-            </Col>
-          </Row>
+          <>
+            <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+              <Col xs={12} sm={6}>
+                <Card style={card}>
+                  <Statistic title="Keywords Checked" value={results.length} valueStyle={{ color: BRAND, fontWeight: 700 }} />
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card style={card}>
+                  <Statistic title="Found / Ranked" value={foundCount} suffix={`/ ${results.length}`} valueStyle={{ color: foundCount > 0 ? colors.success : colors.danger, fontWeight: 700 }} />
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card style={card}>
+                  {avgRank != null ? (
+                    <Statistic title="Avg Rank" value={avgRank} prefix="#" valueStyle={{ color: avgRank <= 10 ? colors.success : avgRank <= 30 ? colors.warning : colors.danger, fontWeight: 700 }} />
+                  ) : (
+                    <Statistic title="Avg Rank" value="N/A" valueStyle={{ color: colors.muted, fontWeight: 700 }} />
+                  )}
+                </Card>
+              </Col>
+              <Col xs={12} sm={6}>
+                <Card style={card}>
+                  <Statistic title="On Page 1" value={page1Count} suffix={`/ ${results.length}`} valueStyle={{ color: page1Count > 0 ? colors.success : colors.muted, fontWeight: 700 }} />
+                </Card>
+              </Col>
+            </Row>
+            {foundCount === 0 && (
+              <div style={{
+                background: isDark ? 'rgba(255,165,0,0.08)' : '#fff8e6',
+                border: `1px solid ${isDark ? 'rgba(255,165,0,0.2)' : '#ffe0a0'}`,
+                borderRadius: radii.sm, padding: '12px 16px', marginBottom: 16,
+              }}>
+                <Text style={{ fontSize: 13, color: isDark ? '#FFB347' : '#B8860B' }}>
+                  <strong>Not ranked yet.</strong> Your listing wasn't found in the top 144 positions (3 pages) for any of these keywords.
+                  This is normal for new listings or highly competitive keywords. Keep optimizing your tags and titles!
+                </Text>
+              </div>
+            )}
+          </>
         )}
 
         {/* ── Tabs ── */}
@@ -539,32 +559,42 @@ const BulkRankCheckerPage = () => {
                       <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
                         Showing rank positions for "<strong>{trendKeyword}</strong>" — lower is better (rank #1 = top)
                       </Text>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, height: 200, paddingTop: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, height: 220, paddingTop: 8 }}>
                         {trendData.map((t, i) => {
-                          const barHeight = t.rank ? Math.max(((t.rank / maxRank) * 160), 12) : 8;
-                          const barColor = !t.found ? colors.muted : t.rank <= 10 ? colors.success : t.rank <= 30 ? colors.warning : colors.danger;
+                          const isFound = t.found && t.rank;
+                          // Invert: lower rank = taller bar (better), capped at maxRank
+                          const barHeight = isFound ? Math.max(((1 - (t.rank - 1) / maxRank) * 160), 16) : 0;
+                          const barColor = !isFound ? colors.muted : t.rank <= 10 ? colors.success : t.rank <= 30 ? colors.warning : colors.danger;
                           return (
                             <Tooltip key={i} title={
                               <div>
                                 <div>{dayjs(t.date).format('MMM D, YYYY')}</div>
-                                <div>Rank: {t.found ? `#${t.rank}` : 'Not found'}</div>
+                                <div>Rank: {isFound ? `#${t.rank}` : 'Not found in top 144'}</div>
                                 {t.change !== 0 && <div>Change: {t.change > 0 ? `+${t.change}` : t.change}</div>}
                               </div>
                             }>
                               <div style={{ flex: 1, textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
-                                <div style={{
-                                  height: barHeight,
-                                  background: `linear-gradient(180deg, ${barColor}, ${barColor}88)`,
-                                  borderRadius: '6px 6px 0 0',
-                                  transition: 'height 0.3s',
-                                  opacity: 0.85,
-                                  minWidth: 16,
-                                }} />
+                                {isFound ? (
+                                  <div style={{
+                                    height: barHeight,
+                                    background: `linear-gradient(180deg, ${barColor}, ${barColor}88)`,
+                                    borderRadius: '6px 6px 0 0',
+                                    transition: 'height 0.3s',
+                                    opacity: 0.85,
+                                    minWidth: 16,
+                                  }} />
+                                ) : (
+                                  <div style={{
+                                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  }}>
+                                    <MinusOutlined style={{ color: colors.muted, fontSize: 10 }} />
+                                  </div>
+                                )}
                                 <Text style={{ fontSize: 9, display: 'block', marginTop: 4, whiteSpace: 'nowrap' }}>
                                   {dayjs(t.date).format('M/D')}
                                 </Text>
                                 <Text style={{ fontSize: 9, fontWeight: 700, color: barColor }}>
-                                  {t.found ? `#${t.rank}` : '—'}
+                                  {isFound ? `#${t.rank}` : 'N/R'}
                                 </Text>
                               </div>
                             </Tooltip>

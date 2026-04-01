@@ -146,7 +146,7 @@ const checkRankings = async (req, res) => {
       rankData = {
         keyword,
         rank: found ? rank : null,
-        page: found ? page : Math.ceil(((rank || totalResults) + 1) / 48),
+        page: found ? page : null,
         volume: totalResults,
         found,
         change,
