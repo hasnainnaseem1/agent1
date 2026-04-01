@@ -61,6 +61,8 @@ const KeywordResearchPage = () => {
   const [trendCategories, setTrendCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [trendLastUpdated, setTrendLastUpdated] = useState(null);
+  // eslint-disable-next-line no-unused-vars
+  const [trendPlanInfo, setTrendPlanInfo] = useState({ plan: '', visibleLimit: 0 });
 
   useEffect(() => {
     etsyApi.getCountries()
@@ -82,6 +84,10 @@ const KeywordResearchPage = () => {
         setTrending(res.data?.trending || []);
         setTrendCategories(res.data?.categories || []);
         setTrendLastUpdated(res.data?.lastUpdated);
+        setTrendPlanInfo({
+          plan: res.data?.plan || '',
+          visibleLimit: res.data?.visibleLimit ?? 0,
+        });
       }
     } catch {
       // silently fail — trending is supplementary
@@ -404,64 +410,142 @@ const KeywordResearchPage = () => {
                 <Spin tip="Loading trending keywords..." />
               </div>
             ) : trending.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {trending.map((t, i) => {
-                  const isRising = t.trendDirection === 'rising';
-                  const isDeclining = t.trendDirection === 'declining';
-                  const isNew = t.trendDirection === 'new';
-                  const scoreColor = t.fusionScore >= 75 ? colors.success : t.fusionScore >= 40 ? colors.warning : colors.danger;
-                  return (
-                    <Tooltip
-                      key={i}
-                      title={
-                        <div style={{ fontSize: 12 }}>
-                          <div><strong>{t.keyword}</strong></div>
-                          <div>Fusion Score: {t.fusionScore}/100</div>
-                          {t.totalResults > 0 && <div>Etsy Results: {t.totalResults.toLocaleString()}</div>}
-                          {t.googleTrends != null && <div>Google Trends: {t.googleTrends}/100</div>}
-                          {t.freshness && <div>Market: {t.freshness}</div>}
-                          {t.competition > 0 && <div>Competition: {t.competition}%</div>}
-                          {t.fusionChange != null && <div>WoW Change: {t.fusionChange > 0 ? '+' : ''}{t.fusionChange}%</div>}
-                        </div>
-                      }
-                    >
-                      <Tag
-                        style={{
-                          cursor: 'pointer',
-                          padding: '4px 12px',
-                          fontSize: 13,
-                          borderRadius: 16,
-                          borderColor: isRising ? colors.success : isDeclining ? colors.danger : scoreColor,
-                          background: isRising
-                            ? (isDark ? 'rgba(82,196,26,0.1)' : '#f6ffed')
-                            : isDeclining
-                            ? (isDark ? 'rgba(255,77,79,0.1)' : '#fff2f0')
-                            : (isDark ? 'rgba(108,99,255,0.1)' : '#f0f0ff'),
-                        }}
-                        onClick={() => {
-                          setKeyword(t.keyword);
-                          // Auto-search
-                          setTimeout(() => {
-                            const btn = document.querySelector('[data-search-btn]');
-                            if (btn) btn.click();
-                          }, 100);
-                        }}
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {trending.map((t, i) => {
+                    const locked = t.isLocked;
+                    const isRising = t.trendDirection === 'rising';
+                    const isDeclining = t.trendDirection === 'declining';
+                    const isNew = t.trendDirection === 'new';
+                    const scoreColor = t.fusionScore >= 75 ? colors.success : t.fusionScore >= 40 ? colors.warning : colors.danger;
+
+                    if (locked) {
+                      return (
+                        <Tag
+                          key={i}
+                          style={{
+                            cursor: 'pointer',
+                            padding: '4px 12px',
+                            fontSize: 13,
+                            borderRadius: 16,
+                            borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#d9d9d9',
+                            background: isDark ? 'rgba(255,255,255,0.04)' : '#fafafa',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
+                          onClick={() => setUpgradeOpen(true)}
+                        >
+                          <span style={{
+                            filter: 'blur(5px)',
+                            userSelect: 'none',
+                            pointerEvents: 'none',
+                          }}>
+                            {t.keyword}
+                          </span>
+                          <LockOutlined style={{
+                            marginLeft: 6,
+                            fontSize: 11,
+                            color: isDark ? 'rgba(255,255,255,0.45)' : '#999',
+                          }} />
+                        </Tag>
+                      );
+                    }
+
+                    return (
+                      <Tooltip
+                        key={i}
+                        title={
+                          <div style={{ fontSize: 12 }}>
+                            <div><strong>{t.keyword}</strong></div>
+                            <div>Fusion Score: {t.fusionScore}/100</div>
+                            {t.totalResults > 0 && <div>Etsy Results: {t.totalResults.toLocaleString()}</div>}
+                            {t.googleTrends != null && <div>Google Trends: {t.googleTrends}/100</div>}
+                            {t.freshness && <div>Market: {t.freshness}</div>}
+                            {t.competition > 0 && <div>Competition: {t.competition}%</div>}
+                            {t.fusionChange != null && <div>WoW Change: {t.fusionChange > 0 ? '+' : ''}{t.fusionChange}%</div>}
+                          </div>
+                        }
                       >
-                        {isRising && <RiseOutlined style={{ color: colors.success, marginRight: 4 }} />}
-                        {isDeclining && <FallOutlined style={{ color: colors.danger, marginRight: 4 }} />}
-                        {isNew && <ThunderboltOutlined style={{ color: colors.brand, marginRight: 4 }} />}
-                        {t.keyword}
-                        <span style={{
-                          fontSize: 10, marginLeft: 6, fontWeight: 700,
-                          color: scoreColor,
-                        }}>
-                          {t.fusionScore}
+                        <Tag
+                          style={{
+                            cursor: 'pointer',
+                            padding: '4px 12px',
+                            fontSize: 13,
+                            borderRadius: 16,
+                            borderColor: isRising ? colors.success : isDeclining ? colors.danger : scoreColor,
+                            background: isRising
+                              ? (isDark ? 'rgba(82,196,26,0.1)' : '#f6ffed')
+                              : isDeclining
+                              ? (isDark ? 'rgba(255,77,79,0.1)' : '#fff2f0')
+                              : (isDark ? 'rgba(108,99,255,0.1)' : '#f0f0ff'),
+                          }}
+                          onClick={() => {
+                            setKeyword(t.keyword);
+                            setTimeout(() => {
+                              const btn = document.querySelector('[data-search-btn]');
+                              if (btn) btn.click();
+                            }, 100);
+                          }}
+                        >
+                          {isRising && <RiseOutlined style={{ color: colors.success, marginRight: 4 }} />}
+                          {isDeclining && <FallOutlined style={{ color: colors.danger, marginRight: 4 }} />}
+                          {isNew && <ThunderboltOutlined style={{ color: colors.brand, marginRight: 4 }} />}
+                          {t.keyword}
+                          <span style={{
+                            fontSize: 10, marginLeft: 6, fontWeight: 700,
+                            color: scoreColor,
+                          }}>
+                            {t.fusionScore}
+                          </span>
+                        </Tag>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+
+                {/* Upgrade CTA for users with locked keywords */}
+                {trending.some(t => t.isLocked) && (
+                  <div style={{
+                    marginTop: 16,
+                    padding: '12px 20px',
+                    borderRadius: 8,
+                    background: isDark
+                      ? 'linear-gradient(135deg, rgba(108,99,255,0.12), rgba(108,99,255,0.04))'
+                      : 'linear-gradient(135deg, rgba(108,99,255,0.08), rgba(108,99,255,0.02))',
+                    border: `1px solid ${isDark ? 'rgba(108,99,255,0.25)' : 'rgba(108,99,255,0.15)'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CrownOutlined style={{ color: colors.brand, fontSize: 16 }} />
+                      <Text style={{ fontSize: 13 }}>
+                        <strong>Unlock Today's Trends</strong>
+                        <span style={{ marginLeft: 6, color: tok.colorTextSecondary }}>
+                          — Upgrade to see all trending keywords with full analytics
                         </span>
-                      </Tag>
-                    </Tooltip>
-                  );
-                })}
-              </div>
+                      </Text>
+                    </div>
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CrownOutlined />}
+                      onClick={() => navigate('/settings?tab=plans')}
+                      style={{
+                        background: `linear-gradient(135deg, ${colors.brand}, ${colors.brandLight})`,
+                        border: 'none',
+                        borderRadius: 6,
+                        fontWeight: 600,
+                        boxShadow: '0 2px 8px rgba(108,99,255,0.3)',
+                      }}
+                    >
+                      Upgrade Plan
+                    </Button>
+                  </div>
+                )}
+              </>
             ) : (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}

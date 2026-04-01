@@ -384,8 +384,43 @@ function hashKey(str) {
 /**
  * GET /api/v1/customer/keywords/trending
  * Returns trending keywords from snapshot data — rising, hot, declining.
+ * Plan-based tiering: Free=5 (all locked), Basic=3, Pro=5, Pro Plus=7
  * Query params: category (optional), limit (default 30)
  */
+
+// How many *visible* (unlocked) trending keywords each plan gets
+const TRENDING_PLAN_LIMITS = {
+  'free':      0,  // Free sees 5 but all blurred/locked
+  'basic':     3,
+  'starter':   3,
+  'pro':       5,
+  'pro plus':  7,
+  'pro_plus':  7,
+  'elite':     Infinity,
+  'unlimited': Infinity,
+};
+
+// Total keywords to return (visible + locked preview)
+const TRENDING_DISPLAY_COUNT = {
+  'free':      5,
+  'basic':     7,
+  'starter':   7,
+  'pro':       10,
+  'pro plus':  30,
+  'pro_plus':  30,
+  'elite':     30,
+  'unlimited': 30,
+};
+
+function getTrendingLimit(planName) {
+  const key = (planName || '').toLowerCase().trim();
+  return {
+    visible: TRENDING_PLAN_LIMITS[key] ?? 0,
+    total: TRENDING_DISPLAY_COUNT[key] ?? 5,
+    plan: planName || 'Free',
+  };
+}
+
 const getTrendingKeywords = async (req, res) => {
   try {
     const { category, limit = 30 } = req.query;
@@ -508,12 +543,48 @@ const getTrendingKeywords = async (req, res) => {
       return (b.fusionScore || 0) - (a.fusionScore || 0);
     });
 
+    // ── Plan-based tiering ──
+    const planName = req.user?.planSnapshot?.planName;
+    const { visible, total, plan: resolvedPlan } = getTrendingLimit(planName);
+    const isFree = (resolvedPlan || '').toLowerCase().trim() === 'free' || !planName;
+
+    const sliced = enriched.slice(0, total);
+
+    // Mark keywords as locked/unlocked based on plan
+    const tiered = sliced.map((kw, idx) => {
+      const isLocked = isFree ? true : idx >= visible;
+      return {
+        ...kw,
+        isLocked,
+        // Mask sensitive data for locked keywords
+        ...(isLocked ? {
+          keyword: kw.keyword, // keep keyword name visible (blurred in UI)
+          fusionScore: kw.fusionScore,
+          trendDirection: kw.trendDirection,
+          // Redact detailed metrics
+          totalResults: null,
+          avgViews: null,
+          avgFavorites: null,
+          competition: null,
+          googleTrends: null,
+          googleTrendDirection: null,
+          freshness: null,
+          velocity: null,
+          fusionChange: null,
+          volumeChange: null,
+        } : {}),
+      };
+    });
+
     return res.json({
       success: true,
       data: {
-        trending: enriched.slice(0, maxLimit),
+        trending: tiered,
         categories: Object.keys(seedKeywordCategories),
         lastUpdated: latestDate,
+        plan: resolvedPlan,
+        visibleLimit: visible,
+        totalLimit: total,
       },
     });
   } catch (error) {
