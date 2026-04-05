@@ -161,6 +161,10 @@ const userSchema = new mongoose.Schema({
     sparse: true,   // allows multiple null values in the unique index
     index: true,
   },
+  passwordSetByUser: {
+    type: Boolean,
+    default: true, // true for email signups, false for Google-only signups
+  },
   lastLogin: Date,
   lastLoginIP: String,
   loginAttempts: {

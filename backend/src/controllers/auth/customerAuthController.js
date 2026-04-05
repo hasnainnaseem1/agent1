@@ -165,6 +165,7 @@ const googleSSO = async (req, res) => {
         email,
         // Google users have no local password — set a random unguessable one
         password: crypto.randomBytes(32).toString('hex'),
+        passwordSetByUser: false,
         accountType: 'customer',
         role: 'customer',
         status: 'active',
@@ -911,7 +912,7 @@ const getMe = async (req, res) => {
         trialEndsAt: user.trialEndsAt || null,
         etsyConnected: etsyShopCount > 0,
         etsyShopCount,
-        hasPassword: !!user.password,
+        hasPassword: !!user.passwordSetByUser,
         googleId: !!user.googleId,
         isEmailVerified: user.isEmailVerified,
         status: user.status,
@@ -1000,8 +1001,8 @@ const changePassword = async (req, res) => {
     const user = await User.findById(req.userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    // SSO users (Google) who never set a password can skip currentPassword
-    const isSSO = !!user.googleId && !user.password;
+    // SSO users (Google) who never set their own password can skip currentPassword
+    const isSSO = !!user.googleId && !user.passwordSetByUser;
     if (!isSSO) {
       if (!currentPassword) {
         return res.status(400).json({ success: false, message: 'Current password is required' });
@@ -1015,6 +1016,7 @@ const changePassword = async (req, res) => {
 
     // Assign plain password — the User model pre-save hook handles bcrypt hashing
     user.password = newPassword;
+    user.passwordSetByUser = true;
     await safeSave(user);
 
     res.json({ success: true, message: 'Password changed successfully' });

@@ -284,7 +284,7 @@ const AppLayout = ({ children }) => {
         )}
 
         {/* ── Features section (scrollable) ── */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+        <div style={{ flex: '1 1 0', overflowY: 'auto', overflowX: 'hidden', minHeight: 0 }}>
           {sectionLabel('Menu')}
           <Menu
             mode="inline"
