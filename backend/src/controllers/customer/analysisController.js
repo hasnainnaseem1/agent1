@@ -631,7 +631,7 @@ function generateDescriptionSuggestion(description, tags, descScore, competitors
 
 // ========== ACTION ITEMS (COMPETITOR-DRIVEN) ==========
 
-function generateActionItems(titleScore, tagsScore, descScore, imageScore, priceScore, categoryScore, shopAttrScore, competitors, userTags, competitorAvg, userPrice) {
+function generateActionItems(titleScore, tagsScore, descScore, imageScore, priceScore, categoryScore, shopAttrScore, competitors, userTags, competitorAvg, userPrice, isDigital, category) {
   const items = [];
   const compKeywords = extractCompetitorTitleKeywords(competitors, 0.6);
   const missingTags = findMissingCompetitorTags(userTags, competitors);
@@ -839,6 +839,10 @@ const analyzeListing = async (req, res) => {
     const listingTags = (tags || []).map(t => typeof t === 'string' ? t.trim() : '').filter(Boolean);
     const listingPrice = parseFloat(price) || 0;
     const images = parseInt(imageCount) || 0;
+    const digital = !!isDigital;
+
+    // Digital products always have "free shipping" (no physical shipping needed)
+    const effectiveFreeShipping = digital ? true : !!freeShipping;
 
     // --- Fetch live competitors from Etsy API ---
     const competitors = await fetchCompetitors(title, category, listingPrice);
@@ -863,10 +867,10 @@ const analyzeListing = async (req, res) => {
     const imageResult   = scoreImageQuality(images);
     const priceResult   = scorePriceCompetitiveness(listingPrice, competitorAvg);
     const catResult     = scoreCategoryAccuracy(category, title, listingTags);
-    const shopAttrResult = scoreShopAttributes(!!freeShipping, processingDays || null, !!returnsAccepted);
+    const shopAttrResult = scoreShopAttributes(effectiveFreeShipping, processingDays || null, !!returnsAccepted);
 
     // --- Weighted total (Title 20, Tags 20, Desc 20, Images 15, Price 15, Category 10, Shop 0 if no data) ---
-    const hasShopData = freeShipping !== undefined || processingDays !== undefined || returnsAccepted !== undefined;
+    const hasShopData = freeShipping !== undefined || processingDays !== undefined || returnsAccepted !== undefined || digital;
     const weights = {
       title: 0.20, tags: 0.20, desc: 0.20, images: 0.15,
       price: 0.15, category: 0.10, shopAttr: hasShopData ? 0.00 : 0.00,
@@ -898,7 +902,7 @@ const analyzeListing = async (req, res) => {
     const descSuggestion  = generateDescriptionSuggestion(description, listingTags, descResult, competitors);
     const actionItems     = generateActionItems(
       titleResult, tagsResult, descResult, imageResult, priceResult, catResult, shopAttrResult,
-      competitors, listingTags, competitorAvg, listingPrice, !!isDigital, category
+      competitors, listingTags, competitorAvg, listingPrice, digital, category
     );
 
     // --- Calculative Pricing Recommendation ---

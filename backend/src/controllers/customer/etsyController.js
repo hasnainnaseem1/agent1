@@ -359,7 +359,8 @@ const getListingById = async (req, res) => {
     let returnsAccepted = listing.returnsAccepted || false;
 
     try {
-      const liveResult = await etsyApi.publicRequest('GET',
+      // Use authenticated request — the listing belongs to the user's shop
+      const liveResult = await etsyApi.authenticatedRequest(shop, 'GET',
         `/v3/application/listings/${listing.etsyListingId}`,
         { params: { includes: 'Images' } }
       );
@@ -371,10 +372,15 @@ const getListingById = async (req, res) => {
             url: img.url_570xN || img.url_fullxfull || img.url_170x135 || '',
             rank: img.rank || 0,
           }));
+          // Update DB cache so future loads are faster
+          await EtsyListing.updateOne(
+            { shopId: shop._id, etsyListingId: listing.etsyListingId },
+            { $set: { images: liveImages, isDigital: !!ld.is_digital } }
+          ).catch(() => {});
         }
         // Digital status
         if (ld.is_digital !== undefined) isDigital = ld.is_digital;
-        // Shipping & returns
+        // Digital products don't need shipping
         if (ld.is_digital) {
           shippingProfile = { freeShipping: true, processingDays: null };
         }
