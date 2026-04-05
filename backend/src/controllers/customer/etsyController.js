@@ -798,7 +798,7 @@ const setListingProperties = async (req, res) => {
       if (prop.scaleId) body.scale_id = prop.scaleId;
 
       const result = await etsyApi.authenticatedRequest(shop, 'PUT',
-        `/v3/application/listings/${listingId}/properties/${prop.propertyId}`,
+        `/v3/application/shops/${shop.shopId}/listings/${listingId}/properties/${prop.propertyId}`,
         { body }
       );
 

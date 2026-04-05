@@ -335,13 +335,8 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
                 {taxonomyProperties.map(prop => (
                   <Col xs={24} sm={12} key={prop.propertyId}>
                     <Form.Item
-                      label={
-                        <span>
-                          {prop.displayName || prop.name}
-                          {prop.isRequired && <Text type="danger" style={{ marginLeft: 4 }}>*</Text>}
-                          {!prop.isRequired && <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>(optional)</Text>}
-                        </span>
-                      }
+                      label={prop.displayName || prop.name}
+                      required={prop.isRequired}
                       style={{ marginBottom: 12 }}
                     >
                       <Select
