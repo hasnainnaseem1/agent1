@@ -231,6 +231,7 @@ const getListings = async (req, res) => {
           favorites: l.favorites,
           tags: l.tags,
           images: l.images,
+          isDigital: l.isDigital || false,
           url: `https://www.etsy.com/listing/${l.etsyListingId}`,
           createdAt: l.originalCreatedAt,
           updatedAt: l.updatedAt,

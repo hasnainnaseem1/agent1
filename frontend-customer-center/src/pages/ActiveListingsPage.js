@@ -7,7 +7,7 @@ import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
   EyeOutlined, ExportOutlined, PlusOutlined, SendOutlined,
-  EditOutlined,
+  EditOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -33,6 +33,27 @@ const ActiveListingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [publishing, setPublishing] = useState(null);
+  const [uploading, setUploading] = useState(null);
+
+  const handleFileUpload = async (listingId) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.zip,.pdf,.epub,.jpg,.jpeg,.png,.gif,.svg,.psd,.ai,.doc,.docx,.xls,.xlsx,.mp3,.wav,.mp4,.mov,.txt,.csv';
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploading(listingId);
+      try {
+        await etsyApi.uploadListingFile(listingId, file);
+        message.success(`File "${file.name}" uploaded successfully! You can now publish this listing.`);
+      } catch (err) {
+        message.error(err?.response?.data?.message || 'Failed to upload file');
+      } finally {
+        setUploading(null);
+      }
+    };
+    input.click();
+  };
 
   const handlePublish = async (listingId) => {
     setPublishing(listingId);
@@ -44,7 +65,9 @@ const ActiveListingsPage = () => {
       const errMsg = err?.response?.data?.message || 'Failed to publish. Ensure listing has at least one image.';
       if (err?.response?.status === 404) {
         message.warning(errMsg);
-        fetchListings(); // Refresh to remove deleted listing
+        fetchListings();
+      } else if (errMsg.toLowerCase().includes('upload a file')) {
+        message.error('This digital listing requires a file before publishing. Use the "Upload File" button first.');
       } else {
         message.error(errMsg);
       }
@@ -72,6 +95,7 @@ const ActiveListingsPage = () => {
         tags: l.tags?.length || 0,
         status: l.state || 'active',
         price: l.price,
+        isDigital: l.isDigital || false,
       }));
       setListings(rows);
     } catch (err) {
@@ -140,9 +164,20 @@ const ActiveListingsPage = () => {
       ),
     },
     {
-      title: '', key: 'action', width: 180, align: 'center',
+      title: '', key: 'action', width: 240, align: 'center',
       render: (_, record) => (
         <Space size={4}>
+          {record.status === 'draft' && record.isDigital && (
+            <Button
+              size="small"
+              icon={<UploadOutlined />}
+              loading={uploading === record.listingId}
+              onClick={() => handleFileUpload(record.listingId)}
+              style={{ borderRadius: radii.pill, fontSize: 12 }}
+            >
+              Upload File
+            </Button>
+          )}
           {record.status === 'draft' && (
             <Button
               type="primary" size="small"
