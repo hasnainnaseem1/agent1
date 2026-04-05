@@ -466,7 +466,7 @@ const createListing = async (req, res) => {
 
     const {
       title, description, price, quantity, taxonomyId,
-      whoMade, whenMade, isDigital,
+      whoMade, whenMade, isDigital, isSupply,
       shippingProfileId, tags, materials,
       personalizationIsRequired, personalizationInstructions,
     } = req.body;
@@ -495,7 +495,7 @@ const createListing = async (req, res) => {
       taxonomy_id: parseInt(taxonomyId, 10),
       who_made: whoMade,
       when_made: whenMade,
-      is_supply: false,
+      is_supply: isSupply === true,
       should_auto_renew: true,
       type: isDigital ? 'download' : 'physical',
     };
@@ -793,9 +793,16 @@ const setListingProperties = async (req, res) => {
 
     for (const prop of properties) {
       const body = {};
+      // Etsy API requires BOTH value_ids and values arrays
       if (prop.valueIds && prop.valueIds.length > 0) body.value_ids = prop.valueIds;
       if (prop.values && prop.values.length > 0) body.values = prop.values;
+      // If we have valueIds but no string values, send empty values array
+      if (body.value_ids && !body.values) body.values = [''];
+      // If we have string values but no valueIds, send empty valueIds array
+      if (body.values && !body.value_ids) body.value_ids = [0];
       if (prop.scaleId) body.scale_id = prop.scaleId;
+
+      log.info(`Setting property ${prop.propertyId} on listing ${listingId}: value_ids=${JSON.stringify(body.value_ids)}, values=${JSON.stringify(body.values)}`);
 
       const result = await etsyApi.authenticatedRequest(shop, 'PUT',
         `/v3/application/shops/${shop.shopId}/listings/${listingId}/properties/${prop.propertyId}`,

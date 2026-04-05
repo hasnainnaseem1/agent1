@@ -109,10 +109,15 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
     }
   }, []);
 
-  const handlePropertyChange = (propertyId, valueId) => {
+  const handlePropertyChange = (propertyId, valueId, option) => {
+    // Store both the numeric ID and string name — Etsy API requires both
+    const valueName = option?.children || '';
     setPropertyValues(prev => ({
       ...prev,
-      [propertyId]: { valueIds: valueId ? [valueId] : [], values: [] },
+      [propertyId]: {
+        valueIds: valueId ? [valueId] : [],
+        values: valueName ? [valueName] : [],
+      },
     }));
   };
 
@@ -179,6 +184,7 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
         whoMade: values.whoMade,
         whenMade: values.whenMade,
         isDigital,
+        isSupply: values.isSupply === true,
         shippingProfileId: isDigital ? undefined : values.shippingProfileId,
         tags: values.tags || [],
         materials: values.materials || [],
@@ -345,7 +351,7 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
                         showSearch
                         loading={propsLoading}
                         value={propertyValues[prop.propertyId]?.valueIds?.[0] || undefined}
-                        onChange={(val) => handlePropertyChange(prop.propertyId, val)}
+                        onChange={(val, option) => handlePropertyChange(prop.propertyId, val, option)}
                         filterOption={(input, option) =>
                           (option?.children || '').toLowerCase().includes(input.toLowerCase())
                         }
@@ -481,6 +487,30 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="isSupply"
+            label="What is it?"
+            rules={[{ required: true, message: 'Required' }]}
+            initialValue={false}
+          >
+            <Radio.Group>
+              <Space direction="vertical">
+                <Radio value={false}>
+                  <div>
+                    <Text strong>A finished product</Text><br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>Ready to use or display</Text>
+                  </div>
+                </Radio>
+                <Radio value={true}>
+                  <div>
+                    <Text strong>A supply or tool to make things</Text><br />
+                    <Text type="secondary" style={{ fontSize: 12 }}>Used to create other products</Text>
+                  </div>
+                </Radio>
+              </Space>
+            </Radio.Group>
+          </Form.Item>
 
           {!isDigital && (
             <Form.Item
