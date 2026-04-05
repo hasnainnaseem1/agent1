@@ -35,24 +35,29 @@ const ActiveListingsPage = () => {
   const [publishing, setPublishing] = useState(null);
   const [uploading, setUploading] = useState(null);
 
-  const handleFileUpload = async (listingId) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.zip,.pdf,.epub,.jpg,.jpeg,.png,.gif,.svg,.psd,.ai,.doc,.docx,.xls,.xlsx,.mp3,.wav,.mp4,.mov,.txt,.csv';
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploading(listingId);
-      try {
-        await etsyApi.uploadListingFile(listingId, file);
-        message.success(`File "${file.name}" uploaded successfully! You can now publish this listing.`);
-      } catch (err) {
-        message.error(err?.response?.data?.message || 'Failed to upload file');
-      } finally {
-        setUploading(null);
-      }
-    };
-    input.click();
+  const handleFileUpload = (listingId, autoPublish = false) => {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.zip,.pdf,.epub,.jpg,.jpeg,.png,.gif,.svg,.psd,.ai,.doc,.docx,.xls,.xlsx,.mp3,.wav,.mp4,.mov,.txt,.csv';
+      input.onchange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) { resolve(false); return; }
+        setUploading(listingId);
+        try {
+          await etsyApi.uploadListingFile(listingId, file);
+          message.success(`File "${file.name}" uploaded successfully!`);
+          resolve(true);
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to upload file');
+          resolve(false);
+        } finally {
+          setUploading(null);
+        }
+      };
+      input.oncancel = () => resolve(false);
+      input.click();
+    });
   };
 
   const handlePublish = async (listingId) => {
@@ -67,7 +72,23 @@ const ActiveListingsPage = () => {
         message.warning(errMsg);
         fetchListings();
       } else if (errMsg.toLowerCase().includes('upload a file')) {
-        message.error('This digital listing requires a file before publishing. Use the "Upload File" button first.');
+        message.info('This digital listing needs a file. Please select a file to upload.');
+        setPublishing(null);
+        const uploaded = await handleFileUpload(listingId);
+        if (uploaded) {
+          // Auto-retry publish after successful file upload
+          setPublishing(listingId);
+          try {
+            await etsyApi.publishListing(listingId);
+            message.success('Listing published successfully!');
+            fetchListings();
+          } catch (retryErr) {
+            message.error(retryErr?.response?.data?.message || 'Failed to publish after file upload. You may need to add an image too.');
+          } finally {
+            setPublishing(null);
+          }
+        }
+        return; // skip the finally below since we handled setPublishing above
       } else {
         message.error(errMsg);
       }
