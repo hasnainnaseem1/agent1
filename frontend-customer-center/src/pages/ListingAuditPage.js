@@ -359,11 +359,23 @@ const ListingAuditPage = () => {
                 <Col xs={24} sm={12} md={8} key={i}>
                   <Card size="small" style={{ borderRadius: radii.sm }}>
                     <Text strong ellipsis style={{ display: 'block', marginBottom: 4 }}>{c.title}</Text>
-                    <Space>
-                      <Tag color="green">${c.price?.toFixed(2)}</Tag>
-                      <Tag>{c.sales} sales</Tag>
-                      <Tag color={colors.brand}>#{c.ranking}</Tag>
-                    </Space>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Space>
+                        <Tag color="green">${c.price?.toFixed(2)}</Tag>
+                        <Tag>{c.sales} sales</Tag>
+                        <Tag color={colors.brand}>#{c.ranking}</Tag>
+                      </Space>
+                      {c.listing_id && (
+                        <a
+                          href={`https://www.etsy.com/listing/${c.listing_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: 12, color: colors.brand, whiteSpace: 'nowrap' }}
+                        >
+                          View on Etsy →
+                        </a>
+                      )}
+                    </div>
                   </Card>
                 </Col>
               ))}

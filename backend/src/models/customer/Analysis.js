@@ -48,7 +48,7 @@ const analysisSchema = new mongoose.Schema({
     shopAttributes:       { score: { type: Number, default: 0 }, weight: { type: Number, default: 0  }, details: { type: mongoose.Schema.Types.Mixed, default: {} } },
   },
 
-  competitors: [{ title: String, price: Number, sales: Number, ranking: Number }],
+  competitors: [{ listing_id: Number, title: String, price: Number, sales: Number, ranking: Number }],
 
   score:          { type: Number, min: 0, max: 100, default: 0 },
   status:         { type: String, enum: ['pending', 'completed', 'failed'], default: 'completed' },

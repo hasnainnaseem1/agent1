@@ -203,7 +203,7 @@ async function fetchCompetitors(title, category, price) {
   }
 
   try {
-    const params = { keywords, limit: 12, sort_on: 'score' };
+    const params = { keywords, limit: 12, sort_on: 'score', includes: 'Images' };
     const result = await etsyApi.publicRequest('GET', '/v3/application/listings/active', { params });
 
     if (!result.success || !result.data?.results?.length) {
@@ -219,10 +219,13 @@ async function fetchCompetitors(title, category, price) {
       .map((l, idx) => {
         const lPrice = parseFloat(l.price?.amount || l.price) / (l.price?.divisor || 100);
         return {
+          listing_id: l.listing_id || null,
           title: l.title || 'Untitled',
           price: Math.round(lPrice * 100) / 100,
           sales: l.num_favorers || 0,
           ranking: idx + 1,
+          tags: l.tags || [],
+          description: l.description || '',
         };
       });
 
@@ -234,10 +237,110 @@ async function fetchCompetitors(title, category, price) {
   }
 }
 
+// ========== COMPETITOR ANALYSIS HELPERS ==========
+
+/**
+ * Extract high-frequency keywords from top competitor titles.
+ * Returns words that appear in >= threshold% of competitor titles.
+ */
+function extractCompetitorTitleKeywords(competitors, threshold = 0.6) {
+  if (!competitors.length) return [];
+
+  const stopWords = new Set([
+    'the', 'and', 'for', 'with', 'from', 'this', 'that', 'are', 'was', 'has',
+    'have', 'had', 'not', 'but', 'all', 'can', 'her', 'his', 'our', 'your',
+    'will', 'one', 'two', 'new', 'now', 'you', 'get', 'set', 'per', 'use',
+  ]);
+
+  const wordCounts = new Map();
+  const total = competitors.length;
+
+  for (const c of competitors) {
+    const words = new Set(
+      c.title.toLowerCase()
+        .replace(/[|,\-–—()[\]{}]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w))
+    );
+    for (const w of words) {
+      wordCounts.set(w, (wordCounts.get(w) || 0) + 1);
+    }
+  }
+
+  return Array.from(wordCounts.entries())
+    .filter(([, count]) => count / total >= threshold)
+    .sort((a, b) => b[1] - a[1])
+    .map(([word, count]) => ({ word, frequency: Math.round((count / total) * 100) }));
+}
+
+/**
+ * Find tags used by competitors that the user is missing.
+ */
+function findMissingCompetitorTags(userTags, competitors) {
+  if (!competitors.length) return [];
+
+  const userTagSet = new Set(userTags.map(t => t.toLowerCase()));
+  const tagCounts = new Map();
+  const total = competitors.length;
+
+  for (const c of competitors) {
+    const seen = new Set();
+    for (const tag of (c.tags || [])) {
+      const tLower = tag.toLowerCase();
+      if (!seen.has(tLower)) {
+        seen.add(tLower);
+        tagCounts.set(tLower, (tagCounts.get(tLower) || { tag, count: 0 }));
+        tagCounts.get(tLower).count += 1;
+      }
+    }
+  }
+
+  return Array.from(tagCounts.values())
+    .filter(t => !userTagSet.has(t.tag.toLowerCase()) && t.count >= 2)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+    .map(t => ({
+      tag: t.tag,
+      usedByCount: t.count,
+      usedByPercent: Math.round((t.count / total) * 100),
+    }));
+}
+
+/**
+ * Analyze competitor description patterns.
+ */
+function analyzeCompetitorDescriptions(competitors) {
+  if (!competitors.length) return { avgWordCount: 0, withBullets: 0, withSections: 0, total: 0 };
+
+  let totalWords = 0;
+  let withBullets = 0;
+  let withSections = 0;
+
+  for (const c of competitors) {
+    const desc = c.description || '';
+    totalWords += desc.split(/\s+/).filter(Boolean).length;
+    if (/[•\-\*]/.test(desc)) withBullets++;
+    if (/[\n\r]/.test(desc) && desc.split(/[\n\r]+/).filter(Boolean).length >= 3) withSections++;
+  }
+
+  return {
+    avgWordCount: Math.round(totalWords / competitors.length),
+    withBullets,
+    withSections,
+    total: competitors.length,
+  };
+}
+
 // ========== TAG CATEGORIZATION ==========
 
-async function categorizeTags(tags, userId) {
+async function categorizeTags(tags, userId, missingCompetitorTags = []) {
   const tagResults = [];
+
+  // Build a map of competitor tags the user is missing for swap suggestions
+  const missingMap = new Map();
+  for (const mt of missingCompetitorTags) {
+    missingMap.set(mt.tag.toLowerCase(), mt);
+  }
 
   // Pull user's keyword research history for volume data
   let researchMap = new Map();
@@ -276,6 +379,16 @@ async function categorizeTags(tags, userId) {
       } else if (wordCount >= 3) {
         category = 'long_tail';
         reasoning = `Long-tail phrase (${wordCount} words), ${research.volumeTier} volume, good for niche targeting`;
+      } else if (research.volumeTier === 'low' && wordCount === 1 && missingCompetitorTags.length > 0) {
+        // Weak single-word tag with low volume — suggest a competitor replacement
+        const swap = missingCompetitorTags.find(mt => !tags.some(t => t.toLowerCase() === mt.tag.toLowerCase()));
+        if (swap) {
+          category = 'moderate';
+          reasoning = `low volume (${research.estimatedVolume.toLocaleString()} results) — consider replacing with "${swap.tag}" (used by ${swap.usedByPercent}% of top competitors)`;
+        } else {
+          category = 'moderate';
+          reasoning = `${research.volumeTier} volume (${research.estimatedVolume.toLocaleString()} results)`;
+        }
       } else {
         category = 'moderate';
         reasoning = `${research.volumeTier} volume (${research.estimatedVolume.toLocaleString()} results)`;
@@ -288,8 +401,15 @@ async function categorizeTags(tags, userId) {
         category = 'moderate';
         reasoning = 'Two-word phrase — moderate specificity';
       } else {
-        category = 'high_volume';
-        reasoning = 'Single-word tag — likely high volume but high competition';
+        // Single-word — suggest competitor swap if available
+        const swap = missingCompetitorTags.find(mt => !tags.some(t => t.toLowerCase() === mt.tag.toLowerCase()));
+        if (swap) {
+          category = 'high_volume';
+          reasoning = `Single-word tag — high competition. Consider replacing with "${swap.tag}" (used by ${swap.usedByPercent}% of top competitors)`;
+        } else {
+          category = 'high_volume';
+          reasoning = 'Single-word tag — likely high volume but high competition';
+        }
       }
     }
 
@@ -299,20 +419,32 @@ async function categorizeTags(tags, userId) {
   return tagResults;
 }
 
-// ========== TITLE & DESCRIPTION SUGGESTIONS ==========
+// ========== TITLE & DESCRIPTION SUGGESTIONS (COMPETITOR-DRIVEN) ==========
 
-function generateTitleSuggestion(title, category, titleScore) {
+function generateTitleSuggestion(title, category, titleScore, competitors) {
   const len = title.length;
+  const titleLower = title.toLowerCase();
+
+  // Extract high-frequency keywords from competitor titles
+  const compKeywords = extractCompetitorTitleKeywords(competitors, 0.6);
+  const missingKeywords = compKeywords.filter(k => !titleLower.includes(k.word));
+
   const parts = [];
 
+  // Suggest missing high-frequency competitor keywords
+  if (missingKeywords.length > 0) {
+    const top = missingKeywords.slice(0, 3);
+    const kwList = top.map(k => `"${k.word}" (in ${k.frequency}% of top listings)`).join(', ');
+    parts.push(`Top-ranking competitors commonly use: ${kwList}. Consider adding these to your title`);
+  }
+
   if (len < 80) {
-    const catWords = (category || '').split(/[\s\/&,>]+/).filter(w => w.length > 2);
-    const titleLower = title.toLowerCase();
-    const missingCatWords = catWords.filter(w => !titleLower.includes(w.toLowerCase()));
-    if (missingCatWords.length > 0) {
-      parts.push(`Consider adding category terms: "${missingCatWords.slice(0, 3).join('", "')}"`);
+    if (missingKeywords.length > 0) {
+      const suggestions = missingKeywords.slice(0, 4).map(k => k.word).join(', ');
+      parts.push(`Your title is ${len} characters (aim for 80-140). Fill the space with competitor keywords: ${suggestions}`);
+    } else {
+      parts.push(`Your title is ${len} characters — aim for 80-140 characters for optimal Etsy SEO`);
     }
-    parts.push(`Your title is ${len} characters — aim for 80-140 characters for optimal Etsy SEO`);
   } else if (len > 140) {
     parts.push(`Your title is ${len} characters — consider trimming to under 140 to avoid truncation in search`);
   }
@@ -325,28 +457,57 @@ function generateTitleSuggestion(title, category, titleScore) {
     parts.push('Include your main category keyword in the title for better search matching');
   }
 
-  if (parts.length === 0) {
-    return { optimized: title, reasoning: 'Your title is well-optimized — good length, front-loaded keywords, and category relevance.' };
+  // Build an optimized title using competitor keywords if current title needs work
+  let optimized = title;
+  if (len < 80 && missingKeywords.length > 0) {
+    // Reconstruct: append relevant competitor keywords using " | " separator
+    const additions = missingKeywords.slice(0, 3).map(k => capitalize(k.word));
+    const proposed = title.replace(/\s*\|\s*$/, '') + ' | ' + additions.join(' | ');
+    if (proposed.length <= 140) {
+      optimized = proposed;
+    } else {
+      // Trim to fit
+      optimized = proposed.substring(0, 137) + '...';
+    }
   }
 
-  return {
-    optimized: title,
-    reasoning: parts.join('. ') + '.',
-  };
+  if (parts.length === 0) {
+    return { optimized: title, reasoning: 'Your title is well-optimized — good length, keywords match top competitors, and category relevance is strong.' };
+  }
+
+  return { optimized, reasoning: parts.join('. ') + '.' };
 }
 
-function generateDescriptionSuggestion(description, tags, descScore) {
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function generateDescriptionSuggestion(description, tags, descScore, competitors) {
   const parts = [];
   const wordCount = descScore.details.wordCount;
+  const compDesc = analyzeCompetitorDescriptions(competitors);
 
-  if (wordCount < 150) {
+  if (compDesc.total > 0 && compDesc.avgWordCount > wordCount) {
+    parts.push(`Your description has ${wordCount} words — top competitors average ${compDesc.avgWordCount} words. Expanding will improve search ranking`);
+  } else if (wordCount < 150) {
     parts.push(`Your description is only ${wordCount} words — aim for 300+ words. Etsy indexes description text for search`);
   } else if (wordCount < 300) {
     parts.push(`Your description has ${wordCount} words — expanding to 300+ words can improve search ranking`);
   }
 
-  if (!descScore.details.hasStructure) {
+  // Compare structural patterns against competitors
+  if (!descScore.details.hasStructure && compDesc.withBullets > 0) {
+    const pct = Math.round((compDesc.withBullets / compDesc.total) * 100);
+    parts.push(`${pct}% of top-ranking competitors use bullet points in their descriptions. Add bullet points for features, sizing, and materials to match market standards`);
+  } else if (!descScore.details.hasStructure) {
     parts.push('Add line breaks, bullet points, or sections to improve readability and conversion');
+  }
+
+  if (compDesc.total > 0 && compDesc.withSections > compDesc.total / 2) {
+    const pct = Math.round((compDesc.withSections / compDesc.total) * 100);
+    if (wordCount < 200) {
+      parts.push(`${pct}% of competitors use structured sections (e.g., Features, Shipping, Care Instructions). Add similar sections to build trust`);
+    }
   }
 
   if (descScore.details.tagMatchCount < Math.ceil(tags.length / 2)) {
@@ -356,49 +517,99 @@ function generateDescriptionSuggestion(description, tags, descScore) {
   if (parts.length === 0) {
     return {
       optimized: description,
-      reasoning: 'Your description is well-structured with good length and keyword integration.',
+      reasoning: 'Your description is well-structured with good length and keyword integration — on par with top competitors.',
     };
   }
 
-  return {
-    optimized: description,
-    reasoning: parts.join('. ') + '.',
-  };
+  return { optimized: description, reasoning: parts.join('. ') + '.' };
 }
 
-// ========== ACTION ITEMS ==========
+// ========== ACTION ITEMS (COMPETITOR-DRIVEN) ==========
 
-function generateActionItems(titleScore, tagsScore, descScore, imageScore, priceScore, categoryScore, shopAttrScore) {
+function generateActionItems(titleScore, tagsScore, descScore, imageScore, priceScore, categoryScore, shopAttrScore, competitors, userTags, competitorAvg, userPrice) {
   const items = [];
+  const compKeywords = extractCompetitorTitleKeywords(competitors, 0.6);
+  const missingTags = findMissingCompetitorTags(userTags, competitors);
+  const compDesc = analyzeCompetitorDescriptions(competitors);
 
+  // Title action
   if (titleScore.score < 70) {
-    items.push({
-      priority: 'high',
-      action: titleScore.details.charCount < 80
-        ? `Expand title from ${titleScore.details.charCount} to 80-140 characters with relevant keywords`
-        : 'Optimize title with front-loaded keywords and category terms',
-      impact: 'Expected 25-35% increase in search visibility',
-    });
+    if (compKeywords.length > 0) {
+      const top = compKeywords.slice(0, 3).map(k => `"${k.word}"`).join(', ');
+      items.push({
+        priority: 'high',
+        action: titleScore.details.charCount < 80
+          ? `Expand title from ${titleScore.details.charCount} to 80-140 characters. Add top competitor keywords: ${top}`
+          : `Optimize title with competitor keywords: ${top} — found in ${compKeywords[0].frequency}%+ of top listings`,
+        impact: 'Expected 25-35% increase in search visibility based on competitor keyword patterns',
+      });
+    } else {
+      items.push({
+        priority: 'high',
+        action: titleScore.details.charCount < 80
+          ? `Expand title from ${titleScore.details.charCount} to 80-140 characters with relevant keywords`
+          : 'Optimize title with front-loaded keywords and category terms',
+        impact: 'Expected 25-35% increase in search visibility',
+      });
+    }
   }
 
-  if (tagsScore.score < 70) {
-    items.push({
-      priority: 'high',
-      action: `Fill all 13 tag slots (currently ${tagsScore.details.count}/13) with multi-word long-tail phrases`,
-      impact: 'Tags are the #1 ranking factor on Etsy',
-    });
+  // Tags action — with specific swap suggestions
+  if (tagsScore.score < 70 || missingTags.length > 0) {
+    if (missingTags.length > 0) {
+      // Find user's weakest tags (single-word or very short)
+      const weakTags = userTags.filter(t => t.trim().split(/\s+/).length === 1).slice(0, 3);
+      const topMissing = missingTags.slice(0, 3);
+
+      if (weakTags.length > 0 && topMissing.length > 0) {
+        const swaps = topMissing.map((m, i) => {
+          const weak = weakTags[i] || weakTags[0];
+          return `Replace "${weak}" with "${m.tag}" (used by ${m.usedByPercent}% of competitors)`;
+        });
+        items.push({
+          priority: 'high',
+          action: swaps.join('. '),
+          impact: `Align your tags with market leaders — these tags appear in ${topMissing[0].usedByPercent}%+ of top listings`,
+        });
+      } else {
+        const tagList = topMissing.map(m => `"${m.tag}" (${m.usedByPercent}%)`).join(', ');
+        items.push({
+          priority: 'high',
+          action: `Add competitor tags you're missing: ${tagList}`,
+          impact: 'Tags are the #1 ranking factor on Etsy — align with top competitors',
+        });
+      }
+    } else {
+      items.push({
+        priority: 'high',
+        action: `Fill all 13 tag slots (currently ${tagsScore.details.count}/13) with multi-word long-tail phrases`,
+        impact: 'Tags are the #1 ranking factor on Etsy',
+      });
+    }
   }
 
+  // Description action — with competitor comparison
   if (descScore.score < 60) {
-    items.push({
-      priority: 'high',
-      action: descScore.details.wordCount < 150
-        ? `Expand description from ${descScore.details.wordCount} to 300+ words`
-        : 'Add bullet points and naturally include tag keywords in description',
-      impact: 'Better descriptions improve conversion rate by 20%',
-    });
+    if (compDesc.total > 0 && compDesc.withBullets > compDesc.total / 2) {
+      items.push({
+        priority: 'high',
+        action: descScore.details.wordCount < 150
+          ? `Expand description from ${descScore.details.wordCount} to ${Math.max(300, compDesc.avgWordCount)}+ words with bullet points for features — ${Math.round((compDesc.withBullets / compDesc.total) * 100)}% of top competitors use this format`
+          : `Add structured bullet points for Features, Sizing, and Materials — ${Math.round((compDesc.withBullets / compDesc.total) * 100)}% of top-ranking competitors use this format`,
+        impact: `Competitors average ${compDesc.avgWordCount} words — match or exceed this for better ranking`,
+      });
+    } else {
+      items.push({
+        priority: 'high',
+        action: descScore.details.wordCount < 150
+          ? `Expand description from ${descScore.details.wordCount} to 300+ words`
+          : 'Add bullet points and naturally include tag keywords in description',
+        impact: 'Better descriptions improve conversion rate by 20%',
+      });
+    }
   }
 
+  // Image action
   if (imageScore.score < 70) {
     items.push({
       priority: 'high',
@@ -407,17 +618,31 @@ function generateActionItems(titleScore, tagsScore, descScore, imageScore, price
     });
   }
 
-  if (priceScore.score < 70 && priceScore.details.competitorAvg) {
-    const pos = priceScore.details.position;
-    items.push({
-      priority: 'medium',
-      action: pos.includes('under') || pos.includes('Below')
-        ? `Consider increasing price toward competitor average ($${priceScore.details.competitorAvg.toFixed(2)})`
-        : `Review pricing — competitor average is $${priceScore.details.competitorAvg.toFixed(2)}`,
-      impact: 'Competitive pricing improves both revenue and perceived value',
-    });
+  // Price action — calculative with specific dollar amounts
+  if (priceScore.score < 70 && competitorAvg > 0) {
+    const diff = Math.abs(competitorAvg - userPrice);
+    const pctBelow = Math.round(((competitorAvg - userPrice) / competitorAvg) * 100);
+    const pctAbove = Math.round(((userPrice - competitorAvg) / competitorAvg) * 100);
+
+    if (userPrice < competitorAvg * 0.8) {
+      // Suggest a premium-competitive price: 10% below competitor avg
+      const suggested = Math.round(competitorAvg * 0.9 * 100) / 100;
+      const increase = Math.round((suggested - userPrice) * 100) / 100;
+      items.push({
+        priority: 'medium',
+        action: `Your price is ${pctBelow}% below the market average ($${competitorAvg.toFixed(2)}). Increase by $${increase.toFixed(2)} to $${suggested.toFixed(2)} to align with premium competitors while maintaining a 10% competitive edge`,
+        impact: `$${increase.toFixed(2)} more revenue per sale while staying below average`,
+      });
+    } else if (userPrice > competitorAvg * 1.2) {
+      items.push({
+        priority: 'medium',
+        action: `Your price is ${pctAbove}% above the market average ($${competitorAvg.toFixed(2)}). Ensure premium quality justifies the $${diff.toFixed(2)} premium, or consider reducing to $${(competitorAvg * 1.1).toFixed(2)} for a 10% premium positioning`,
+        impact: 'Overpriced listings lose sales velocity and search ranking',
+      });
+    }
   }
 
+  // Category action
   if (categoryScore.score < 60) {
     items.push({
       priority: 'medium',
@@ -426,6 +651,7 @@ function generateActionItems(titleScore, tagsScore, descScore, imageScore, price
     });
   }
 
+  // Shop attribute actions
   if (!shopAttrScore.details.freeShipping) {
     items.push({
       priority: 'medium',
@@ -529,24 +755,37 @@ const analyzeListing = async (req, res) => {
       shopAttrResult.score * weights.shopAttr
     );
 
-    // --- Categorize tags ---
-    const categorizedTags = await categorizeTags(listingTags, req.userId);
+    // --- Categorize tags (with competitor tag analysis) ---
+    const missingCompetitorTags = findMissingCompetitorTags(listingTags, competitors);
+    const categorizedTags = await categorizeTags(listingTags, req.userId, missingCompetitorTags);
 
-    // --- Generate rule-based suggestions ---
-    const titleSuggestion = generateTitleSuggestion(title, category, titleResult);
-    const descSuggestion  = generateDescriptionSuggestion(description, listingTags, descResult);
-    const actionItems     = generateActionItems(titleResult, tagsResult, descResult, imageResult, priceResult, catResult, shopAttrResult);
+    // --- Generate competitor-driven suggestions ---
+    const titleSuggestion = generateTitleSuggestion(title, category, titleResult, competitors);
+    const descSuggestion  = generateDescriptionSuggestion(description, listingTags, descResult, competitors);
+    const actionItems     = generateActionItems(
+      titleResult, tagsResult, descResult, imageResult, priceResult, catResult, shopAttrResult,
+      competitors, listingTags, competitorAvg, listingPrice
+    );
 
-    // --- Pricing recommendation ---
+    // --- Calculative Pricing Recommendation ---
     let pricingReasoning;
+    let suggestedPrice = listingPrice;
     if (competitorAvg > 0) {
       const ratio = listingPrice / competitorAvg;
+      const pctBelow = Math.round(((competitorAvg - listingPrice) / competitorAvg) * 100);
+      const pctAbove = Math.round(((listingPrice - competitorAvg) / competitorAvg) * 100);
+
       if (ratio < 0.8) {
-        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is ${Math.round((1 - ratio) * 100)}% below the competitor average of $${competitorAvg.toFixed(2)}. Consider increasing to capture more revenue.`;
+        // Suggest 10% below competitor avg for competitive edge
+        suggestedPrice = Math.round(competitorAvg * 0.9 * 100) / 100;
+        const increase = Math.round((suggestedPrice - listingPrice) * 100) / 100;
+        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is ${pctBelow}% below the competitor average of $${competitorAvg.toFixed(2)}. You can increase your price by $${increase.toFixed(2)} to $${suggestedPrice.toFixed(2)} to align with premium competitors while maintaining a 10% competitive edge.`;
       } else if (ratio > 1.2) {
-        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is ${Math.round((ratio - 1) * 100)}% above the competitor average of $${competitorAvg.toFixed(2)}. Ensure your quality and branding justify the premium.`;
+        suggestedPrice = Math.round(competitorAvg * 1.1 * 100) / 100;
+        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is ${pctAbove}% above the competitor average of $${competitorAvg.toFixed(2)}. Consider reducing by $${(listingPrice - suggestedPrice).toFixed(2)} to $${suggestedPrice.toFixed(2)} for a 10% premium positioning that balances revenue with competitiveness.`;
       } else {
-        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is competitive — within range of the competitor average ($${competitorAvg.toFixed(2)}).`;
+        suggestedPrice = competitorAvg;
+        pricingReasoning = `Your price of $${listingPrice.toFixed(2)} is competitive — within range of the market average ($${competitorAvg.toFixed(2)}). You're well-positioned against ${competitors.length} competitors (range: $${competitorMin.toFixed(2)} – $${competitorMax.toFixed(2)}).`;
       }
     } else {
       pricingReasoning = 'Competitor pricing data unavailable. Your price was scored neutrally.';
@@ -559,7 +798,7 @@ const analyzeListing = async (req, res) => {
       descriptionReasoning: descSuggestion.reasoning,
       optimizedTags: categorizedTags,
       pricingRecommendation: {
-        suggestedPrice: competitorAvg > 0 ? Math.round(competitorAvg * 100) / 100 : listingPrice,
+        suggestedPrice: Math.round(suggestedPrice * 100) / 100,
         reasoning: pricingReasoning,
         competitorRange: {
           min: competitorMin,
@@ -581,7 +820,7 @@ const analyzeListing = async (req, res) => {
       shopAttributes:       { score: shopAttrResult.score, weight: Math.round(weights.shopAttr * 100), details: shopAttrResult.details },
     };
 
-    // --- Create analysis record ---
+    // --- Create analysis record (store full competitor data for history) ---
     const analysis = new Analysis({
       userId: req.userId,
       originalListing: {
@@ -593,7 +832,9 @@ const analyzeListing = async (req, res) => {
       },
       recommendations,
       breakdown,
-      competitors,
+      competitors: competitors.map(c => ({
+        listing_id: c.listing_id, title: c.title, price: c.price, sales: c.sales, ranking: c.ranking,
+      })),
       score: totalScore,
       status: 'completed',
       processingTime: Date.now() - startTime,
@@ -602,6 +843,11 @@ const analyzeListing = async (req, res) => {
     await safeSave(analysis);
 
     log.info(`Analysis completed: score=${totalScore}, competitors=${competitors.length}, time=${Date.now() - startTime}ms`);
+
+    // Lean competitor array for frontend (no description/tags bulk data)
+    const leanCompetitors = competitors.map(c => ({
+      listing_id: c.listing_id, title: c.title, price: c.price, sales: c.sales, ranking: c.ranking,
+    }));
 
     // Feature usage info from middleware
     const featureAccess = req.featureAccess || {};
@@ -614,7 +860,7 @@ const analyzeListing = async (req, res) => {
         score: totalScore,
         breakdown,
         recommendations,
-        competitors,
+        competitors: leanCompetitors,
         processingTime: analysis.processingTime,
         createdAt: analysis.createdAt,
       },
