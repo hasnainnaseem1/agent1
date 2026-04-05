@@ -31,6 +31,8 @@ const ETSY_TOKEN_URL = 'https://api.etsy.com/v3/public/oauth/token';
 const SCOPES = [
   'shops_r',        // Read shop info
   'listings_r',     // Read listings
+  'listings_w',     // Write/create listings
+  'listings_d',     // Delete listings
   'transactions_r', // Read orders/receipts for delivery tracking
   'profile_r',      // Read user profile
 ];
