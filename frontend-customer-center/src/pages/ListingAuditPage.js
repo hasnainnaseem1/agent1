@@ -234,24 +234,46 @@ const ListingAuditPage = () => {
                     label: <span><BulbOutlined /> Description</span>,
                     children: (
                       <div style={{ padding: '16px 0 24px' }}>
-                        <div style={{
-                          background: isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)',
-                          padding: 16, borderRadius: radii.sm, marginBottom: 8,
-                          border: `1px solid ${isDark ? 'rgba(108,99,255,0.2)' : 'rgba(108,99,255,0.1)'}`,
-                          whiteSpace: 'pre-wrap', lineHeight: 1.7,
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => copyText(rec.optimizedDescription)}>
-                              Copy
-                            </Button>
+                        {rec.descriptionRecommendations?.length > 0 ? (
+                          <>
+                            <div style={{ marginBottom: 12 }}>
+                              <Text strong style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>Recommendations</Text>
+                            </div>
+                            <div style={{
+                              background: isDark ? 'rgba(108,99,255,0.08)' : 'rgba(108,99,255,0.04)',
+                              padding: 16, borderRadius: radii.sm, marginBottom: 12,
+                              border: `1px solid ${isDark ? 'rgba(108,99,255,0.2)' : 'rgba(108,99,255,0.1)'}`,
+                            }}>
+                              {rec.descriptionRecommendations.map((item, idx) => (
+                                <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: idx < rec.descriptionRecommendations.length - 1 ? 10 : 0 }}>
+                                  <span style={{ color: colors.brand, fontWeight: 600, flexShrink: 0 }}>•</span>
+                                  <Text style={{ fontSize: 13, lineHeight: 1.6 }}>{item}</Text>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{
+                            background: isDark ? 'rgba(82,196,26,0.08)' : 'rgba(82,196,26,0.04)',
+                            padding: 16, borderRadius: radii.sm, marginBottom: 12,
+                            border: `1px solid ${isDark ? 'rgba(82,196,26,0.2)' : 'rgba(82,196,26,0.1)'}`,
+                          }}>
+                            <Text style={{ color: '#52c41a', fontWeight: 600 }}>✓ Your description looks great — no changes needed.</Text>
                           </div>
-                          {rec.optimizedDescription}
-                        </div>
+                        )}
+
                         <Collapse ghost items={[{
-                          key: 'reasoning',
-                          label: <Text type="secondary" style={{ fontSize: 12 }}>Why this works →</Text>,
-                          children: <Text type="secondary" style={{ fontSize: 13 }}>{rec.descriptionReasoning}</Text>,
+                          key: 'original',
+                          label: <Text type="secondary" style={{ fontSize: 12 }}>Your current description →</Text>,
+                          children: <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, fontSize: 13, color: isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.45)' }}>{rec.optimizedDescription}</div>,
                         }]} />
+                        {rec.descriptionReasoning && (
+                          <Collapse ghost items={[{
+                            key: 'reasoning',
+                            label: <Text type="secondary" style={{ fontSize: 12 }}>Analysis details →</Text>,
+                            children: <Text type="secondary" style={{ fontSize: 13 }}>{rec.descriptionReasoning}</Text>,
+                          }]} />
+                        )}
                       </div>
                     ),
                   },

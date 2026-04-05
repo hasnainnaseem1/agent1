@@ -184,6 +184,37 @@ function hashKey(str) {
   return crypto.createHash('md5').update(str.toLowerCase()).digest('hex').substring(0, 12);
 }
 
+/**
+ * Robust Etsy price parser.
+ * Handles: Money object {amount, divisor}, raw number (dollars), string.
+ */
+function parseEtsyPrice(priceField) {
+  if (!priceField) return 0;
+  // Money object: { amount: 1399, divisor: 100 } → $13.99
+  if (typeof priceField === 'object' && priceField.amount != null) {
+    const divisor = priceField.divisor || 100;
+    return parseFloat(priceField.amount) / divisor;
+  }
+  // Already a number (raw dollars from some API formats)
+  const num = parseFloat(priceField);
+  return isNaN(num) ? 0 : num;
+}
+
+/**
+ * Remove price outliers using IQR method.
+ * Returns prices within 1.5× IQR of Q1–Q3 range.
+ */
+function removeOutliers(prices) {
+  if (prices.length < 4) return prices;
+  const sorted = [...prices].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+  return prices.filter(p => p >= lowerBound && p <= upperBound);
+}
+
 async function fetchCompetitors(title, category, price) {
   // Build search keywords from title (first 5 meaningful words)
   const keywords = title
@@ -211,26 +242,32 @@ async function fetchCompetitors(title, category, price) {
     }
 
     const competitors = result.data.results
-      .filter(l => {
-        const lPrice = parseFloat(l.price?.amount || l.price) / (l.price?.divisor || 100);
-        return lPrice > 0;
+      .map((l) => {
+        const lPrice = parseEtsyPrice(l.price);
+        return { raw: l, price: lPrice };
       })
-      .slice(0, 8)
-      .map((l, idx) => {
-        const lPrice = parseFloat(l.price?.amount || l.price) / (l.price?.divisor || 100);
-        return {
-          listing_id: l.listing_id || null,
-          title: l.title || 'Untitled',
-          price: Math.round(lPrice * 100) / 100,
-          sales: l.num_favorers || 0,
-          ranking: idx + 1,
-          tags: l.tags || [],
-          description: l.description || '',
-        };
-      });
+      .filter(item => item.price > 0)
+      .slice(0, 10); // take more initially for outlier filtering
 
-    try { await redis.set(cacheKey, competitors, 3600); } catch (_) { /* ignore */ }
-    return competitors;
+    // Remove price outliers before ranking
+    const validPrices = removeOutliers(competitors.map(c => c.price));
+    const maxValidPrice = validPrices.length > 0 ? Math.max(...validPrices) * 2 : Infinity;
+
+    const cleaned = competitors
+      .filter(c => c.price <= maxValidPrice)
+      .slice(0, 8)
+      .map((item, idx) => ({
+        listing_id: item.raw.listing_id || null,
+        title: item.raw.title || 'Untitled',
+        price: Math.round(item.price * 100) / 100,
+        sales: item.raw.num_favorers || 0,
+        ranking: idx + 1,
+        tags: item.raw.tags || [],
+        description: item.raw.description || '',
+      }));
+
+    try { await redis.set(cacheKey, cleaned, 3600); } catch (_) { /* ignore */ }
+    return cleaned;
   } catch (error) {
     log.warn('Competitor fetch failed:', error.message);
     return [];
@@ -333,14 +370,37 @@ function analyzeCompetitorDescriptions(competitors) {
 
 // ========== TAG CATEGORIZATION ==========
 
+/**
+ * Look up estimated volume for a single tag via Etsy API.
+ * Checks Redis cache first (6h TTL), then does live lookup.
+ */
+async function lookupTagVolume(tag) {
+  const cacheKey = `kw:insight:${hashKey(tag.toLowerCase())}`;
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) return cached;
+  } catch (_) { /* ignore */ }
+
+  try {
+    const result = await etsyApi.publicRequest('GET', '/v3/application/listings/active', {
+      params: { keywords: tag, limit: 5 },
+    });
+    if (result.success) {
+      const totalResults = result.data?.count || 0;
+      const data = {
+        estimatedVolume: totalResults,
+        competitionLevel: totalResults > 100000 ? 'high' : totalResults > 10000 ? 'medium' : 'low',
+        volumeTier: totalResults > 100000 ? 'very_high' : totalResults > 50000 ? 'high' : totalResults > 10000 ? 'medium' : 'low',
+      };
+      try { await redis.set(cacheKey, data, 21600); } catch (_) { /* ignore */ }
+      return data;
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
 async function categorizeTags(tags, userId, missingCompetitorTags = []) {
   const tagResults = [];
-
-  // Build a map of competitor tags the user is missing for swap suggestions
-  const missingMap = new Map();
-  for (const mt of missingCompetitorTags) {
-    missingMap.set(mt.tag.toLowerCase(), mt);
-  }
 
   // Pull user's keyword research history for volume data
   let researchMap = new Map();
@@ -364,6 +424,30 @@ async function categorizeTags(tags, userId, missingCompetitorTags = []) {
     }
   } catch (_) { /* ignore */ }
 
+  // Live-lookup tags that have no research data or 0 volume (parallel, max 13 tags)
+  const tagsNeedingLookup = tags.filter(tag => {
+    const research = researchMap.get(tag.toLowerCase());
+    return !research || research.estimatedVolume === 0;
+  });
+
+  if (tagsNeedingLookup.length > 0) {
+    const lookupResults = await Promise.allSettled(
+      tagsNeedingLookup.map(tag => lookupTagVolume(tag))
+    );
+
+    for (let i = 0; i < tagsNeedingLookup.length; i++) {
+      const result = lookupResults[i];
+      if (result.status === 'fulfilled' && result.value) {
+        const key = tagsNeedingLookup[i].toLowerCase();
+        // Only overwrite if live data has actual volume or no research existed
+        const existing = researchMap.get(key);
+        if (!existing || existing.estimatedVolume === 0) {
+          researchMap.set(key, result.value);
+        }
+      }
+    }
+  }
+
   for (const tag of tags) {
     const tagLower = tag.toLowerCase();
     const wordCount = tag.trim().split(/\s+/).length;
@@ -372,28 +456,29 @@ async function categorizeTags(tags, userId, missingCompetitorTags = []) {
     let category = 'analyzing';
     let reasoning = '';
 
-    if (research) {
+    if (research && research.estimatedVolume > 0) {
       if (research.volumeTier === 'very_high' || research.volumeTier === 'high') {
         category = 'high_volume';
         reasoning = `High search volume (${research.estimatedVolume.toLocaleString()} results), ${research.competitionLevel} competition`;
       } else if (wordCount >= 3) {
         category = 'long_tail';
-        reasoning = `Long-tail phrase (${wordCount} words), ${research.volumeTier} volume, good for niche targeting`;
-      } else if (research.volumeTier === 'low' && wordCount === 1 && missingCompetitorTags.length > 0) {
-        // Weak single-word tag with low volume — suggest a competitor replacement
-        const swap = missingCompetitorTags.find(mt => !tags.some(t => t.toLowerCase() === mt.tag.toLowerCase()));
-        if (swap) {
-          category = 'moderate';
-          reasoning = `low volume (${research.estimatedVolume.toLocaleString()} results) — consider replacing with "${swap.tag}" (used by ${swap.usedByPercent}% of top competitors)`;
-        } else {
-          category = 'moderate';
-          reasoning = `${research.volumeTier} volume (${research.estimatedVolume.toLocaleString()} results)`;
-        }
-      } else {
+        reasoning = `Long-tail phrase (${wordCount} words), ${research.estimatedVolume.toLocaleString()} results, good for niche targeting`;
+      } else if (research.volumeTier === 'medium') {
         category = 'moderate';
-        reasoning = `${research.volumeTier} volume (${research.estimatedVolume.toLocaleString()} results)`;
+        reasoning = `${research.estimatedVolume.toLocaleString()} results, ${research.competitionLevel} competition`;
+      } else {
+        // Low volume — suggest swap if applicable
+        const swap = missingCompetitorTags.find(mt => !tags.some(t => t.toLowerCase() === mt.tag.toLowerCase()));
+        if (swap && wordCount === 1) {
+          category = 'moderate';
+          reasoning = `${research.estimatedVolume.toLocaleString()} results — consider replacing with "${swap.tag}" (used by ${swap.usedByPercent}% of top competitors)`;
+        } else {
+          category = wordCount >= 2 ? 'moderate' : 'high_volume';
+          reasoning = `${research.estimatedVolume.toLocaleString()} results, ${research.competitionLevel} competition`;
+        }
       }
     } else {
+      // No volume data available even after live lookup
       if (wordCount >= 3) {
         category = 'long_tail';
         reasoning = 'Multi-word long-tail phrase — typically lower competition, higher conversion';
@@ -401,7 +486,6 @@ async function categorizeTags(tags, userId, missingCompetitorTags = []) {
         category = 'moderate';
         reasoning = 'Two-word phrase — moderate specificity';
       } else {
-        // Single-word — suggest competitor swap if available
         const swap = missingCompetitorTags.find(mt => !tags.some(t => t.toLowerCase() === mt.tag.toLowerCase()));
         if (swap) {
           category = 'high_volume';
@@ -511,17 +595,38 @@ function generateDescriptionSuggestion(description, tags, descScore, competitors
   }
 
   if (descScore.details.tagMatchCount < Math.ceil(tags.length / 2)) {
-    parts.push(`Only ${descScore.details.tagMatchCount} of your ${tags.length} tags appear in your description — naturally weave more tag keywords into the text`);
+    const missingTags = tags.filter(t => !description.toLowerCase().includes(t.toLowerCase())).slice(0, 5);
+    const missingList = missingTags.map(t => `"${t}"`).join(', ');
+    parts.push(`Only ${descScore.details.tagMatchCount} of your ${tags.length} tags appear in your description. Missing tags to weave in: ${missingList}`);
   }
 
-  if (parts.length === 0) {
+  // Build specific structural recommendations
+  const recommendations = [];
+  if (wordCount < 300) {
+    recommendations.push(`Expand from ${wordCount} to 300+ words — add product details, use cases, and specifications`);
+  }
+  if (!descScore.details.hasStructure) {
+    recommendations.push('Add sections with headers (e.g., "✨ Features", "📦 What\'s Included", "💝 Perfect For")');
+  }
+  if (descScore.details.tagMatchCount < tags.length) {
+    const missing = tags.filter(t => !description.toLowerCase().includes(t.toLowerCase())).slice(0, 3);
+    if (missing.length > 0) {
+      recommendations.push(`Naturally include these tags in your text: ${missing.join(', ')}`);
+    }
+  }
+  if (compDesc.total > 0 && compDesc.avgWordCount > 0) {
+    recommendations.push(`Competitor benchmark: avg ${compDesc.avgWordCount} words, ${compDesc.withBullets}/${compDesc.total} use bullet points`);
+  }
+
+  if (parts.length === 0 && recommendations.length === 0) {
     return {
       optimized: description,
+      descriptionRecommendations: [],
       reasoning: 'Your description is well-structured with good length and keyword integration — on par with top competitors.',
     };
   }
 
-  return { optimized: description, reasoning: parts.join('. ') + '.' };
+  return { optimized: description, descriptionRecommendations: recommendations, reasoning: parts.join('. ') + '.' };
 }
 
 // ========== ACTION ITEMS (COMPETITOR-DRIVEN) ==========
@@ -796,6 +901,7 @@ const analyzeListing = async (req, res) => {
       titleReasoning: titleSuggestion.reasoning,
       optimizedDescription: descSuggestion.optimized,
       descriptionReasoning: descSuggestion.reasoning,
+      descriptionRecommendations: descSuggestion.descriptionRecommendations || [],
       optimizedTags: categorizedTags,
       pricingRecommendation: {
         suggestedPrice: Math.round(suggestedPrice * 100) / 100,
