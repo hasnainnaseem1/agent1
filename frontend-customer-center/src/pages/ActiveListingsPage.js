@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Typography, Tag, Row, Col, Statistic,
-  Button, theme, Input, message, Empty, Spin, Space,
+  Button, theme, Input, message, Empty, Spin, Space, Popconfirm,
 } from 'antd';
 import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
   EyeOutlined, ExportOutlined, PlusOutlined, SendOutlined,
-  EditOutlined, UploadOutlined,
+  EditOutlined, UploadOutlined, PauseCircleOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -38,6 +38,7 @@ const ActiveListingsPage = () => {
   const [publishing, setPublishing] = useState(null);
   const [uploading, setUploading] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [deactivating, setDeactivating] = useState(null);
 
   const handleFileUpload = (listingId, autoPublish = false) => {
     return new Promise((resolve) => {
@@ -98,6 +99,19 @@ const ActiveListingsPage = () => {
       }
     } finally {
       setPublishing(null);
+    }
+  };
+
+  const handleDeactivate = async (listingId) => {
+    setDeactivating(listingId);
+    try {
+      await etsyApi.deactivateListing(listingId);
+      message.success('Listing deactivated successfully!');
+      fetchListings();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to deactivate listing');
+    } finally {
+      setDeactivating(null);
     }
   };
 
@@ -224,13 +238,14 @@ const ActiveListingsPage = () => {
       title: 'Status', dataIndex: 'status', key: 'status', width: 100, align: 'center',
       filters: [
         { text: 'Active', value: 'active' },
+        { text: 'Inactive', value: 'inactive' },
         { text: 'Draft', value: 'draft' },
       ],
       onFilter: (value, record) => record.status === value,
       render: (s) => (
         <Tag
-          icon={s === 'active' ? <CheckCircleOutlined /> : s === 'draft' ? <EditOutlined /> : <ExclamationCircleOutlined />}
-          color={s === 'active' ? 'green' : s === 'draft' ? 'orange' : 'default'}
+          icon={s === 'active' ? <CheckCircleOutlined /> : s === 'draft' ? <EditOutlined /> : s === 'inactive' ? <PauseCircleOutlined /> : <ExclamationCircleOutlined />}
+          color={s === 'active' ? 'green' : s === 'draft' ? 'orange' : s === 'inactive' ? 'red' : 'default'}
           style={{ borderRadius: radii.pill }}
         >
           {s}
@@ -238,7 +253,7 @@ const ActiveListingsPage = () => {
       ),
     },
     {
-      title: '', key: 'action', width: 240, align: 'center',
+      title: '', key: 'action', width: 320, align: 'center',
       render: (_, record) => (
         <Space size={4}>
           {record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
@@ -250,6 +265,25 @@ const ActiveListingsPage = () => {
             >
               Edit
             </Button>
+          )}
+          {record.status === 'active' && record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
+            <Popconfirm
+              title="Deactivate this listing?"
+              description="The listing will be hidden from your Etsy shop."
+              onConfirm={() => handleDeactivate(record.listingId)}
+              okText="Deactivate"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                size="small"
+                icon={<PauseCircleOutlined />}
+                loading={deactivating === record.listingId}
+                style={{ borderRadius: radii.pill, fontSize: 12 }}
+              >
+                Deactivate
+              </Button>
+            </Popconfirm>
           )}
           {record.status === 'draft' && record.isDigital && (
             <Button

@@ -907,7 +907,7 @@ const updateListing = async (req, res) => {
     const {
       title, description, price, quantity, taxonomyId,
       whoMade, whenMade, isSupply, shippingProfileId,
-      tags, materials, imageIds,
+      tags, materials, imageIds, state,
       isPersonalizable, personalizationIsRequired,
       personalizationCharCountMax, personalizationInstructions,
     } = req.body;
@@ -923,6 +923,11 @@ const updateListing = async (req, res) => {
     if (whenMade !== undefined) body.when_made = whenMade;
     if (isSupply !== undefined) body.is_supply = isSupply === true;
     if (shippingProfileId !== undefined) body.shipping_profile_id = parseInt(shippingProfileId, 10);
+
+    // Listing state — Etsy allows 'active' or 'inactive' for updates
+    if (state !== undefined && (state === 'active' || state === 'inactive')) {
+      body.state = state;
+    }
 
     // Image reordering — pass image_ids to set new image order
     if (imageIds !== undefined && Array.isArray(imageIds) && imageIds.length > 0) {

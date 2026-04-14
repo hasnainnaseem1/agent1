@@ -70,6 +70,9 @@ const etsyApi = {
   // Get shipping profiles
   getShippingProfiles: () => axiosInstance.get('/api/v1/customer/etsy/shipping-profiles').then(r => r.data),
 
+  // Deactivate a listing (move to inactive)
+  deactivateListing: (listingId) => axiosInstance.patch(`/api/v1/customer/etsy/listings/${listingId}`, { state: 'inactive' }).then(r => r.data),
+
   // Publish a draft listing
   publishListing: (listingId) => axiosInstance.put(`/api/v1/customer/etsy/listings/${listingId}/publish`).then(r => r.data),
 

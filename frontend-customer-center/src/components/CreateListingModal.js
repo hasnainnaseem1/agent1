@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Modal, Form, Input, InputNumber, Select, Switch, Upload, Button,
+  Modal, Form, Input, InputNumber, Select, Switch, Button,
   Cascader, Steps, Typography, Row, Col, Divider, message, Alert, Tag, Space,
-  theme, Radio,
+  theme, Radio, Spin, Tooltip, Popconfirm,
 } from 'antd';
 import {
-  PlusOutlined, UploadOutlined, FileOutlined, PictureOutlined,
-  TagsOutlined, DollarOutlined, InboxOutlined,
+  PlusOutlined, FileOutlined, PictureOutlined,
+  TagsOutlined, DollarOutlined, DeleteOutlined,
+  VideoCameraOutlined, CloseCircleFilled,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
@@ -14,8 +15,8 @@ import etsyApi from '../api/etsyApi';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
-const { Dragger } = Upload;
 const BRAND = '#6C63FF';
+const MAX_IMAGES = 10;
 
 const WHO_MADE_OPTIONS = [
   { value: 'i_did', label: 'I did' },
@@ -25,11 +26,11 @@ const WHO_MADE_OPTIONS = [
 
 const WHEN_MADE_OPTIONS = [
   { value: 'made_to_order', label: 'Made to order' },
-  { value: '2020_2025', label: '2020 – 2025' },
+  { value: '2020_2026', label: '2020 – 2026' },
   { value: '2010_2019', label: '2010 – 2019' },
-  { value: '2004_2009', label: '2004 – 2009' },
-  { value: 'before_2004', label: 'Before 2004' },
-  { value: '2000_2003', label: '2000 – 2003' },
+  { value: '2007_2009', label: '2007 – 2009' },
+  { value: 'before_2007', label: 'Before 2007' },
+  { value: '2000_2006', label: '2000 – 2006' },
   { value: '1990s', label: '1990s' },
   { value: '1980s', label: '1980s' },
   { value: '1970s', label: '1970s' },
@@ -53,13 +54,17 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
   const [shippingProfiles, setShippingProfiles] = useState([]);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [isDigital, setIsDigital] = useState(false);
-  const [imageFiles, setImageFiles] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]); // Array of File objects
   const [digitalFiles, setDigitalFiles] = useState([]);
-  const [createdListingId, setCreatedListingId] = useState(null);
+  const [videoFile, setVideoFile] = useState(null); // Single video File
   const [uploadProgress, setUploadProgress] = useState('');
   const [taxonomyProperties, setTaxonomyProperties] = useState([]);
   const [propsLoading, setPropsLoading] = useState(false);
-  const [propertyValues, setPropertyValues] = useState({}); // { propertyId: { valueIds, values } }
+  const [propertyValues, setPropertyValues] = useState({});
+  const [dragIndex, setDragIndex] = useState(null);
+
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
   // Load categories on mount
   useEffect(() => {
@@ -127,10 +132,11 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
     setIsDigital(false);
     setImageFiles([]);
     setDigitalFiles([]);
-    setCreatedListingId(null);
+    setVideoFile(null);
     setUploadProgress('');
     setTaxonomyProperties([]);
     setPropertyValues({});
+    setDragIndex(null);
   };
 
   const handleClose = () => {
@@ -199,17 +205,26 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
       }
 
       const listingId = createRes.data.listingId;
-      setCreatedListingId(listingId);
 
       // Upload images sequentially
       if (imageFiles.length > 0) {
         for (let i = 0; i < imageFiles.length; i++) {
           setUploadProgress(`Uploading image ${i + 1}/${imageFiles.length}...`);
           try {
-            await etsyApi.uploadListingImage(listingId, imageFiles[i].originFileObj || imageFiles[i]);
+            await etsyApi.uploadListingImage(listingId, imageFiles[i]);
           } catch (err) {
             message.warning(`Image ${i + 1} failed to upload: ${err.message}`);
           }
+        }
+      }
+
+      // Upload video
+      if (videoFile) {
+        setUploadProgress('Uploading video...');
+        try {
+          await etsyApi.uploadListingVideo(listingId, videoFile);
+        } catch (err) {
+          message.warning(`Video failed to upload: ${err.message}`);
         }
       }
 
@@ -573,44 +588,243 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
       title: 'Photos & Files',
       content: (
         <>
-          <div style={{ marginBottom: 24 }}>
-            <Text strong style={{ display: 'block', marginBottom: 8 }}>
+          {/* Image grid — same layout as EditListingModal */}
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 16,
+            border: `1px solid ${borderColor}`,
+          }}>
+            <Text strong style={{ display: 'block', marginBottom: 10 }}>
               <PictureOutlined style={{ marginRight: 6, color: BRAND }} />
-              Listing Photos <Text type="secondary" style={{ fontSize: 12 }}>(up to 10 images)</Text>
+              Photos ({imageFiles.length}/{MAX_IMAGES})
             </Text>
-            <Dragger
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8,
+            }}>
+              {Array.from({ length: MAX_IMAGES }).map((_, i) => {
+                if (i < imageFiles.length) {
+                  const file = imageFiles[i];
+                  const url = URL.createObjectURL(file);
+                  return (
+                    <div
+                      key={`img-${i}`}
+                      draggable
+                      onDragStart={e => { setDragIndex(i); e.dataTransfer.effectAllowed = 'move'; }}
+                      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        if (dragIndex === null || dragIndex === i) return;
+                        const reordered = [...imageFiles];
+                        const [moved] = reordered.splice(dragIndex, 1);
+                        reordered.splice(i, 0, moved);
+                        setImageFiles(reordered);
+                        setDragIndex(null);
+                      }}
+                      onDragEnd={() => setDragIndex(null)}
+                      style={{
+                        position: 'relative', width: '100%', aspectRatio: '1',
+                        borderRadius: 8, overflow: 'hidden',
+                        border: dragIndex === i ? `2px solid ${BRAND}` : `2px solid ${isDark ? '#444' : '#e8e8e8'}`,
+                        cursor: 'grab',
+                        opacity: dragIndex === i ? 0.5 : 1,
+                        transition: 'opacity 0.2s, border-color 0.2s',
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={`Upload ${i + 1}`}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onLoad={() => URL.revokeObjectURL(url)}
+                      />
+                      {i === 0 && (
+                        <div style={{
+                          position: 'absolute', top: 4, left: 4,
+                          background: BRAND, color: '#fff', fontSize: 9,
+                          padding: '1px 5px', borderRadius: 4, fontWeight: 600,
+                        }}>Primary</div>
+                      )}
+                      {/* Delete overlay */}
+                      <div style={{
+                        position: 'absolute', bottom: 0, left: 0, right: 0,
+                        display: 'flex', justifyContent: 'center', gap: 4,
+                        background: 'rgba(0,0,0,0.55)', padding: '4px 0',
+                      }}>
+                        <Tooltip title="Remove">
+                          <Button
+                            type="text" size="small"
+                            icon={<DeleteOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />}
+                            style={{ minWidth: 0, padding: '0 6px' }}
+                            onClick={() => setImageFiles(prev => prev.filter((_, idx) => idx !== i))}
+                          />
+                        </Tooltip>
+                      </div>
+                    </div>
+                  );
+                }
+                // Empty slot
+                return (
+                  <div
+                    key={`empty-${i}`}
+                    onClick={() => imageFiles.length < MAX_IMAGES && imageInputRef.current?.click()}
+                    style={{
+                      width: '100%', aspectRatio: '1', borderRadius: 8,
+                      border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', transition: 'border-color 0.2s',
+                      background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
+                  >
+                    <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
+                    <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Add</Text>
+                  </div>
+                );
+              })}
+            </div>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp"
               multiple
-              maxCount={10}
-              accept="image/*"
-              fileList={imageFiles}
-              onChange={({ fileList }) => setImageFiles(fileList.slice(0, 10))}
-              beforeUpload={() => false}
-              listType="picture"
-            >
-              <p className="ant-upload-drag-icon"><InboxOutlined style={{ color: BRAND }} /></p>
-              <p className="ant-upload-text">Click or drag images here</p>
-              <p className="ant-upload-hint">JPG, PNG, or GIF — first image is the thumbnail</p>
-            </Dragger>
+              style={{ display: 'none' }}
+              onChange={e => {
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
+                setImageFiles(prev => [...prev, ...files].slice(0, MAX_IMAGES));
+                e.target.value = '';
+              }}
+            />
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+              Etsy allows up to 10 photos. Supported: JPG, PNG, GIF, WebP. Drag images to reorder.
+            </Text>
+          </div>
+
+          {/* Video section — reuse EditListingModal pattern */}
+          <div style={{
+            background: cardBg, borderRadius: radii.sm, padding: 16,
+            border: `1px solid ${borderColor}`, marginTop: 12,
+          }}>
+            <Text strong style={{ display: 'block', marginBottom: 10 }}>
+              <VideoCameraOutlined style={{ marginRight: 6, color: BRAND }} />
+              Video {videoFile ? '(1)' : ''}
+            </Text>
+            {videoFile ? (
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{
+                  position: 'relative', width: 140, height: 100, borderRadius: 8,
+                  overflow: 'hidden', border: `2px solid ${borderColor}`, background: '#000',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <VideoCameraOutlined style={{ fontSize: 28, color: '#666' }} />
+                  <Text style={{ position: 'absolute', bottom: 4, left: 0, right: 0, textAlign: 'center', color: '#ccc', fontSize: 10 }}>
+                    {videoFile.name}
+                  </Text>
+                  <Popconfirm
+                    title="Remove this video?"
+                    onConfirm={() => setVideoFile(null)}
+                    okText="Remove"
+                    okButtonProps={{ danger: true }}
+                  >
+                    <Button
+                      type="text" size="small"
+                      icon={<CloseCircleFilled style={{ color: '#ff4d4f', fontSize: 16 }} />}
+                      style={{
+                        position: 'absolute', top: 2, right: 2,
+                        minWidth: 0, padding: 0, width: 22, height: 22,
+                        background: '#fff', borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    />
+                  </Popconfirm>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={() => videoInputRef.current?.click()}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 8,
+                  border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
+              >
+                <VideoCameraOutlined style={{ fontSize: 24, color: isDark ? '#888' : '#bbb' }} />
+                <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>Add a video</Text>
+              </div>
+            )}
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/x-msvideo,video/webm"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files?.[0];
+                if (file) setVideoFile(file);
+                e.target.value = '';
+              }}
+            />
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 8 }}>
+              Videos may take a few minutes to process after upload. Supported: MP4, MOV, AVI, WebM.
+            </Text>
           </div>
 
           {isDigital && (
-            <div>
+            <div style={{ marginTop: 12 }}>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>
                 <FileOutlined style={{ marginRight: 6, color: BRAND }} />
                 Digital Files <Text type="secondary" style={{ fontSize: 12 }}>(buyers download these after purchase)</Text>
               </Text>
-              <Dragger
-                multiple
-                maxCount={5}
-                fileList={digitalFiles}
-                onChange={({ fileList }) => setDigitalFiles(fileList.slice(0, 5))}
-                beforeUpload={() => false}
-                listType="text"
+              <div
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.onchange = (ev) => {
+                    const files = Array.from(ev.target.files || []);
+                    setDigitalFiles(prev => [...prev, ...files.map(f => ({ originFileObj: f, name: f.name, uid: `${Date.now()}-${f.name}` }))].slice(0, 5));
+                  };
+                  input.click();
+                }}
+                style={{
+                  width: '100%', padding: '20px 0', borderRadius: 8,
+                  border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                  background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
               >
-                <p className="ant-upload-drag-icon"><InboxOutlined style={{ color: BRAND }} /></p>
-                <p className="ant-upload-text">Click or drag your digital files here</p>
-                <p className="ant-upload-hint">ZIP, PDF, PES, DST, SVG, PNG, etc. — max 20MB per file</p>
-              </Dragger>
+                <FileOutlined style={{ fontSize: 24, color: isDark ? '#888' : '#bbb' }} />
+                <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>Click to add digital files</Text>
+                <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>ZIP, PDF, PES, DST, SVG, PNG, etc. — max 20MB per file</Text>
+              </div>
+              {digitalFiles.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  {digitalFiles.map((f, idx) => (
+                    <div key={f.uid || idx} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '4px 8px', marginBottom: 4,
+                      background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                      borderRadius: 6,
+                    }}>
+                      <Text style={{ fontSize: 12 }}><FileOutlined style={{ marginRight: 4 }} />{f.name || f.originFileObj?.name}</Text>
+                      <Button
+                        type="text" size="small"
+                        icon={<DeleteOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
+                        onClick={() => setDigitalFiles(prev => prev.filter((_, i) => i !== idx))}
+                        style={{ minWidth: 0, padding: '0 4px' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </>
