@@ -207,11 +207,13 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
       const listingId = createRes.data.listingId;
 
       // Upload images sequentially
+      let imagesUploaded = 0;
       if (imageFiles.length > 0) {
         for (let i = 0; i < imageFiles.length; i++) {
           setUploadProgress(`Uploading image ${i + 1}/${imageFiles.length}...`);
           try {
             await etsyApi.uploadListingImage(listingId, imageFiles[i]);
+            imagesUploaded++;
           } catch (err) {
             message.warning(`Image ${i + 1} failed to upload: ${err.message}`);
           }
@@ -229,11 +231,13 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
       }
 
       // Upload digital files
+      let digitalFilesUploaded = 0;
       if (isDigital && digitalFiles.length > 0) {
         for (let i = 0; i < digitalFiles.length; i++) {
           setUploadProgress(`Uploading file ${i + 1}/${digitalFiles.length}...`);
           try {
             await etsyApi.uploadListingFile(listingId, digitalFiles[i].originFileObj || digitalFiles[i]);
+            digitalFilesUploaded++;
           } catch (err) {
             message.warning(`File ${i + 1} failed to upload: ${err.message}`);
           }
@@ -258,8 +262,21 @@ const CreateListingModal = ({ open, onClose, onSuccess }) => {
         }
       }
 
+      // Auto-publish if all required assets uploaded successfully
+      const canPublish = imagesUploaded > 0 && (!isDigital || digitalFilesUploaded > 0);
+      if (canPublish) {
+        setUploadProgress('Publishing listing...');
+        try {
+          await etsyApi.publishListing(listingId);
+          message.success('Listing created and published on Etsy!');
+        } catch {
+          message.success('Listing created as draft. You can publish it from the listings page.');
+        }
+      } else {
+        message.success('Listing created as draft on Etsy!');
+      }
+
       setUploadProgress('');
-      message.success('Listing created successfully on Etsy!');
       onSuccess?.(createRes.data);
       handleClose();
     } catch (err) {
