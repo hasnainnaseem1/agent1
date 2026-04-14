@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const etsyController = require('../../../controllers/customer/etsyController');
 const { checkShopConnection } = require('../../../middleware/etsy');
-const { checkShopLimit } = require('../../../middleware/subscription');
+const { checkShopLimit, checkSubscription, checkFeatureAccess, trackFeatureUsage } = require('../../../middleware/subscription');
 
 // Multer config for file uploads (in-memory, max 20MB)
 const upload = multer({
@@ -62,8 +62,13 @@ router.get('/shipping-profiles', checkShopConnection, etsyController.getShipping
 
 // @route   POST /api/v1/customer/etsy/listings
 // @desc    Create a new listing on Etsy
-// @access  Private — requires shop connection
-router.post('/listings', checkShopConnection, etsyController.createListing);
+// @access  Private — requires shop connection + create_listing feature
+router.post('/listings', checkShopConnection, checkSubscription, checkFeatureAccess('create_listing'), trackFeatureUsage('create_listing'), etsyController.createListing);
+
+// @route   PATCH /api/v1/customer/etsy/listings/:listingId
+// @desc    Update an existing listing on Etsy
+// @access  Private — requires shop connection + edit_listing feature
+router.patch('/listings/:listingId', checkShopConnection, checkSubscription, checkFeatureAccess('edit_listing'), trackFeatureUsage('edit_listing'), etsyController.updateListing);
 
 // @route   POST /api/v1/customer/etsy/listings/:listingId/images
 // @desc    Upload an image to an Etsy listing

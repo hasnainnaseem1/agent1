@@ -28,6 +28,9 @@ const etsyApi = {
   // Create listing on Etsy
   createListing:  (data) => axiosInstance.post('/api/v1/customer/etsy/listings', data).then(r => r.data),
 
+  // Update an existing listing on Etsy
+  updateListing:  (listingId, data) => axiosInstance.patch(`/api/v1/customer/etsy/listings/${listingId}`, data).then(r => r.data),
+
   // Upload image to a listing
   uploadListingImage: (listingId, file) => {
     const formData = new FormData();

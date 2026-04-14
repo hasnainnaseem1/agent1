@@ -358,6 +358,17 @@ const getListingById = async (req, res) => {
     let isDigital = listing.isDigital || false;
     let shippingProfile = listing.shippingProfile || {};
     let returnsAccepted = listing.returnsAccepted || false;
+    // Additional editable fields — start from DB cache
+    let whoMade = null;
+    let whenMade = null;
+    let isSupply = false;
+    let shippingProfileId = null;
+    let quantity = listing.quantity || 1;
+    let materials = listing.materials || [];
+    let isPersonalizable = false;
+    let personalizationIsRequired = false;
+    let personalizationCharCountMax = null;
+    let personalizationInstructions = '';
 
     try {
       // Use authenticated request — the listing belongs to the user's shop
@@ -385,6 +396,17 @@ const getListingById = async (req, res) => {
         if (ld.is_digital) {
           shippingProfile = { freeShipping: true, processingDays: null };
         }
+        // Extract additional editable fields from live data
+        if (ld.who_made) whoMade = ld.who_made;
+        if (ld.when_made) whenMade = ld.when_made;
+        if (ld.is_supply !== undefined) isSupply = ld.is_supply;
+        if (ld.shipping_profile_id) shippingProfileId = ld.shipping_profile_id;
+        if (ld.quantity !== undefined) quantity = ld.quantity;
+        if (ld.materials && ld.materials.length > 0) materials = ld.materials;
+        if (ld.is_personalizable !== undefined) isPersonalizable = ld.is_personalizable;
+        if (ld.personalization_is_required !== undefined) personalizationIsRequired = ld.personalization_is_required;
+        if (ld.personalization_char_count_max !== undefined) personalizationCharCountMax = ld.personalization_char_count_max;
+        if (ld.personalization_instructions) personalizationInstructions = ld.personalization_instructions;
       }
     } catch (apiErr) {
       log.warn('Live listing fetch failed, using cached data:', apiErr.message);
@@ -397,16 +419,26 @@ const getListingById = async (req, res) => {
         title: listing.title,
         description: listing.description || '',
         tags: listing.tags || [],
+        materials,
         price: listing.price,
+        quantity,
         category: (listing.taxonomyPath || []).join(' > '),
         taxonomyId: listing.taxonomyId,
         images: liveImages,
         isDigital,
         shippingProfile,
+        shippingProfileId,
         returnsAccepted,
         views: listing.views,
         favorites: listing.favorites,
         state: listing.state,
+        whoMade,
+        whenMade,
+        isSupply,
+        isPersonalizable,
+        personalizationIsRequired,
+        personalizationCharCountMax,
+        personalizationInstructions,
       },
     });
   } catch (error) {
@@ -835,6 +867,132 @@ const setListingProperties = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/v1/customer/etsy/listings/:listingId
+ * Update an existing listing on Etsy.
+ * Only provided fields are sent to the API.
+ */
+const updateListing = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+
+    // Verify listing exists locally
+    const listing = await EtsyListing.findOne({ shopId: shop._id, etsyListingId: String(listingId) });
+    if (!listing) {
+      return res.status(404).json({ success: false, message: 'Listing not found' });
+    }
+
+    const {
+      title, description, price, quantity, taxonomyId,
+      whoMade, whenMade, isSupply, shippingProfileId,
+      tags, materials,
+      isPersonalizable, personalizationIsRequired,
+      personalizationCharCountMax, personalizationInstructions,
+    } = req.body;
+
+    // Build body with only provided (non-undefined) fields
+    const body = {};
+
+    if (title !== undefined) body.title = title.trim();
+    if (description !== undefined) body.description = description.trim();
+    if (price !== undefined) body.price = parseFloat(price);
+    if (quantity !== undefined) body.quantity = parseInt(quantity, 10);
+    if (taxonomyId !== undefined) body.taxonomy_id = parseInt(taxonomyId, 10);
+    if (whoMade !== undefined) body.who_made = whoMade;
+    if (whenMade !== undefined) body.when_made = whenMade;
+    if (isSupply !== undefined) body.is_supply = isSupply === true;
+    if (shippingProfileId !== undefined) body.shipping_profile_id = parseInt(shippingProfileId, 10);
+
+    // Tags (max 13)
+    if (tags !== undefined) {
+      body.tags = (tags || []).slice(0, 13).map(t => t.trim()).filter(Boolean);
+    }
+
+    // Materials (max 13)
+    if (materials !== undefined) {
+      body.materials = (materials || []).slice(0, 13).map(m => m.trim()).filter(Boolean);
+    }
+
+    // Personalization
+    if (isPersonalizable !== undefined) {
+      body.is_personalizable = isPersonalizable === true;
+      if (isPersonalizable) {
+        if (personalizationIsRequired !== undefined) body.personalization_is_required = personalizationIsRequired === true;
+        if (personalizationCharCountMax !== undefined) body.personalization_char_count_max = parseInt(personalizationCharCountMax, 10);
+        if (personalizationInstructions !== undefined) body.personalization_instructions = personalizationInstructions.trim();
+      }
+    }
+
+    if (Object.keys(body).length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields provided to update' });
+    }
+
+    log.info(`Updating listing ${listingId} on Etsy for shop ${shop.shopId}: ${Object.keys(body).join(', ')}`);
+
+    const result = await etsyApi.authenticatedRequest(shop, 'PATCH',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
+      { body }
+    );
+
+    if (!result.success) {
+      log.error('Etsy update listing failed:', result.error);
+
+      if (result.status === 404 || (result.error && String(result.error).toLowerCase().includes('not found'))) {
+        await EtsyListing.deleteOne({ shopId: shop._id, etsyListingId: String(listingId) }).catch(() => {});
+        return res.status(404).json({
+          success: false,
+          message: 'This listing no longer exists on Etsy. It has been removed from your dashboard.',
+        });
+      }
+
+      return res.status(502).json({
+        success: false,
+        message: result.error || 'Failed to update listing on Etsy',
+      });
+    }
+
+    const updated = result.data;
+
+    // Update local DB
+    const dbUpdate = {};
+    if (updated.title) dbUpdate.title = updated.title;
+    if (updated.description) dbUpdate.description = updated.description;
+    if (updated.tags) dbUpdate.tags = updated.tags;
+    if (updated.materials) dbUpdate.materials = updated.materials;
+    if (updated.price?.amount != null) dbUpdate.price = updated.price.amount / updated.price.divisor;
+    if (updated.quantity != null) dbUpdate.quantity = updated.quantity;
+    if (updated.taxonomy_id) dbUpdate.taxonomyId = updated.taxonomy_id;
+    if (updated.state) dbUpdate.state = updated.state;
+    dbUpdate.syncedAt = new Date();
+
+    await EtsyListing.updateOne(
+      { shopId: shop._id, etsyListingId: String(listingId) },
+      { $set: dbUpdate }
+    ).catch(err => log.warn('Failed to update local listing:', err.message));
+
+    log.info(`Listing ${listingId} updated successfully`);
+
+    return res.json({
+      success: true,
+      message: 'Listing updated successfully',
+      data: {
+        listingId: updated.listing_id || listingId,
+        title: updated.title,
+        state: updated.state,
+        url: `https://www.etsy.com/listing/${listingId}`,
+      },
+    });
+  } catch (error) {
+    log.error('Update listing error:', error.message, error.stack);
+    return res.status(500).json({ success: false, message: 'Failed to update listing' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -846,6 +1004,7 @@ module.exports = {
   getSyncStatus,
   getShippingProfiles,
   createListing,
+  updateListing,
   uploadListingImage,
   uploadListingFile,
   publishListing,

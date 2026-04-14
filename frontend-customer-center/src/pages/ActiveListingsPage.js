@@ -14,6 +14,7 @@ import FeatureGate from '../components/common/FeatureGate';
 import QuotaBanner from '../components/common/QuotaBanner';
 import UsageBadge from '../components/common/UsageBadge';
 import CreateListingModal from '../components/CreateListingModal';
+import EditListingModal from '../components/EditListingModal';
 import { usePermissions } from '../context/PermissionsContext';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
@@ -32,6 +33,8 @@ const ActiveListingsPage = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editListingId, setEditListingId] = useState(null);
   const [publishing, setPublishing] = useState(null);
   const [uploading, setUploading] = useState(null);
   const [syncing, setSyncing] = useState(false);
@@ -238,6 +241,16 @@ const ActiveListingsPage = () => {
       title: '', key: 'action', width: 240, align: 'center',
       render: (_, record) => (
         <Space size={4}>
+          {record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => { setEditListingId(record.listingId); setEditOpen(true); }}
+              style={{ borderRadius: radii.pill, fontSize: 12 }}
+            >
+              Edit
+            </Button>
+          )}
           {record.status === 'draft' && record.isDigital && (
             <Button
               size="small"
@@ -320,14 +333,16 @@ const ActiveListingsPage = () => {
               style={{ width: 280, borderRadius: radii.sm }}
             />
             <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => setCreateOpen(true)}
-                style={{ background: BRAND, borderColor: BRAND, borderRadius: radii.sm }}
-              >
-                Create Listing
-              </Button>
+              {getFeatureAccess('create_listing').state === 'unlocked' && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => setCreateOpen(true)}
+                  style={{ background: BRAND, borderColor: BRAND, borderRadius: radii.sm }}
+                >
+                  Create Listing
+                </Button>
+              )}
               <Button icon={<ReloadOutlined />} loading={syncing} onClick={handleSync}>
                 Sync
               </Button>
@@ -352,6 +367,13 @@ const ActiveListingsPage = () => {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         onSuccess={() => { setCreateOpen(false); fetchListings(); }}
+      />
+
+      <EditListingModal
+        open={editOpen}
+        onClose={() => { setEditOpen(false); setEditListingId(null); }}
+        onSuccess={() => { setEditOpen(false); setEditListingId(null); fetchListings(); }}
+        listingId={editListingId}
       />
     </AppLayout>
   );
