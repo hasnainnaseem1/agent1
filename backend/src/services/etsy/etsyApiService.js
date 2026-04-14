@@ -282,6 +282,12 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
         };
       }
 
+      // Handle 204 No Content (common for DELETE operations)
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        log.info(`authRequest: ${method} ${path} → SUCCESS (no content)`);
+        return { success: true, data: null };
+      }
+
       const data = await response.json();
       log.info(`authRequest: ${method} ${path} → SUCCESS`);
       return { success: true, data };
