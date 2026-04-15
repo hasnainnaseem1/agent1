@@ -301,6 +301,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     try {
       await etsyApi.uploadListingFile(listingId, file);
       message.success(`File "${file.name}" uploaded successfully!`);
+      setMediaChanged(true);
       // Refresh file list
       const fRes = await etsyApi.getListingFiles(listingId);
       setExistingFiles(fRes.data?.files || []);
@@ -316,6 +317,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     try {
       await etsyApi.deleteListingFile(listingId, fileId);
       setExistingFiles(prev => prev.filter(f => f.listing_file_id !== fileId));
+      setMediaChanged(true);
       message.success('File deleted');
     } catch (err) {
       message.error(err?.response?.data?.message || 'Failed to delete file');
