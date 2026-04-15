@@ -185,7 +185,9 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
         'x-api-key': apiKeyHeader,
         'Authorization': `Bearer ${currentAccessToken}`,
       };
-      if (!options.formData) {
+      if (options.urlEncodedBody) {
+        baseHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+      } else if (!options.formData) {
         baseHeaders['Content-Type'] = 'application/json';
       }
 
@@ -193,6 +195,8 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
       let fetchBody;
       if (options.formData) {
         fetchBody = options.formData;
+      } else if (options.urlEncodedBody) {
+        fetchBody = new URLSearchParams(options.urlEncodedBody).toString();
       } else if (options.body) {
         fetchBody = JSON.stringify(options.body);
       }
@@ -225,7 +229,9 @@ const authenticatedRequest = async (etsyShop, method, path, options = {}) => {
           'x-api-key': apiKeyHeader,
           'Authorization': `Bearer ${currentAccessToken}`,
         };
-        if (!options.formData) {
+        if (options.urlEncodedBody) {
+          retryHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        } else if (!options.formData) {
           retryHeaders['Content-Type'] = 'application/json';
         }
 

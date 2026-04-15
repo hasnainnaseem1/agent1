@@ -984,7 +984,7 @@ const updateListing = async (req, res) => {
     const {
       title, description, price, quantity, taxonomyId,
       whoMade, whenMade, isDigital, isSupply, shippingProfileId,
-      tags, materials, imageIds, state, featured_rank,
+      tags, materials, imageIds, state,
       isPersonalizable, personalizationIsRequired,
       personalizationCharCountMax, personalizationInstructions,
     } = req.body;
@@ -1005,12 +1005,6 @@ const updateListing = async (req, res) => {
     // Listing state — Etsy allows 'active' or 'inactive' for updates
     if (state !== undefined && (state === 'active' || state === 'inactive')) {
       body.state = state;
-    }
-
-    // Featured rank — 0 to un-feature, 1+ to feature
-    if (featured_rank !== undefined) {
-      const rank = parseInt(featured_rank, 10);
-      if (!isNaN(rank) && rank >= 0) body.featured_rank = rank;
     }
 
     // Image reordering — pass image_ids to set new image order
@@ -1073,11 +1067,6 @@ const updateListing = async (req, res) => {
       }
 
       updated = result.data;
-
-      // Log featured_rank for debugging
-      if (featured_rank !== undefined) {
-        log.info(`Featured rank update — sent: ${featured_rank}, Etsy returned: ${updated?.featured_rank}`);
-      }
     }
 
     // Update price/quantity via Inventory API
@@ -1143,7 +1132,6 @@ const updateListing = async (req, res) => {
       if (updated.materials) dbUpdate.materials = updated.materials;
       if (updated.taxonomy_id) dbUpdate.taxonomyId = updated.taxonomy_id;
       if (updated.state) dbUpdate.state = updated.state;
-      if (updated.featured_rank !== undefined) dbUpdate.featuredRank = updated.featured_rank;
     }
     if (isDigital !== undefined) dbUpdate.isDigital = isDigital === true;
     if (price !== undefined) dbUpdate.price = parseFloat(price);
@@ -1296,6 +1284,63 @@ const deleteListingVideo = async (req, res) => {
   }
 };
 
+// ─── Feature / Unfeature a listing ──────────────────────────────────
+const featureListing = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+    const { featured_rank } = req.body;
+
+    if (featured_rank === undefined) {
+      return res.status(400).json({ success: false, message: 'featured_rank is required' });
+    }
+
+    const rank = parseInt(featured_rank, 10);
+    if (isNaN(rank) || rank < 0) {
+      return res.status(400).json({ success: false, message: 'featured_rank must be a non-negative integer' });
+    }
+
+    log.info(`Feature listing ${listingId}: setting featured_rank=${rank} for shop ${shop.shopId}`);
+
+    // Etsy updateListing requires application/x-www-form-urlencoded
+    const result = await etsyApi.authenticatedRequest(shop, 'PATCH',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}`,
+      { urlEncodedBody: { featured_rank: rank } }
+    );
+
+    if (!result.success) {
+      log.error('Etsy feature listing failed:', result.error);
+      return res.status(502).json({
+        success: false,
+        message: result.error || 'Failed to update featured status on Etsy',
+      });
+    }
+
+    const etsyReturned = result.data?.featured_rank;
+    log.info(`Featured rank update — sent: ${rank}, Etsy returned: ${etsyReturned}`);
+
+    // Update local DB — trust the sent value since Etsy may not echo it correctly
+    const dbRank = etsyReturned !== undefined ? etsyReturned : rank;
+    await EtsyListing.updateOne(
+      { shopId: shop._id, etsyListingId: String(listingId) },
+      { $set: { featuredRank: dbRank, syncedAt: new Date() } }
+    ).catch(err => log.warn('Failed to update local listing featuredRank:', err.message));
+
+    return res.json({
+      success: true,
+      message: rank > 0 ? 'Listing featured!' : 'Listing unfeatured',
+      data: { featuredRank: dbRank },
+    });
+  } catch (error) {
+    log.error('Feature listing error:', error.message, error.stack);
+    return res.status(500).json({ success: false, message: 'Failed to update featured status' });
+  }
+};
+
 module.exports = {
   initiateAuth,
   handleCallback,
@@ -1318,4 +1363,5 @@ module.exports = {
   publishListing,
   getTaxonomyProperties,
   setListingProperties,
+  featureListing,
 };

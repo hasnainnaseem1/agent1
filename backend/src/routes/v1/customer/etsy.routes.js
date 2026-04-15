@@ -76,6 +76,11 @@ router.post('/listings', checkShopConnection, checkSubscription, checkFeatureAcc
 // @access  Private — requires shop connection + edit_listing feature
 router.patch('/listings/:listingId', checkShopConnection, checkSubscription, checkFeatureAccess('edit_listing'), trackFeatureUsage('edit_listing'), etsyController.updateListing);
 
+// @route   PATCH /api/v1/customer/etsy/listings/:listingId/featured
+// @desc    Feature or unfeature a listing on Etsy
+// @access  Private — requires shop connection + edit_listing feature
+router.patch('/listings/:listingId/featured', checkShopConnection, checkSubscription, checkFeatureAccess('edit_listing'), etsyController.featureListing);
+
 // @route   POST /api/v1/customer/etsy/listings/:listingId/images
 // @desc    Upload an image to an Etsy listing
 // @access  Private — requires shop connection

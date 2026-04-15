@@ -142,11 +142,15 @@ const ActiveListingsPage = () => {
         return;
       }
     }
+    const newRank = isFeatured ? 0 : 1;
     setFeaturing(listingId);
     try {
-      await etsyApi.featureListing(listingId, isFeatured ? 0 : 1);
+      await etsyApi.featureListing(listingId, newRank);
+      // Optimistic UI update — reflect star change immediately
+      setListings(prev => prev.map(l =>
+        l.listingId === String(listingId) ? { ...l, featuredRank: newRank } : l
+      ));
       message.success(isFeatured ? 'Listing unfeatured' : 'Listing featured!');
-      fetchListings();
     } catch (err) {
       message.error(err?.response?.data?.message || 'Failed to update featured status');
     } finally {
