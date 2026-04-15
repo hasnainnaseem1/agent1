@@ -40,7 +40,7 @@ const syncListings = async (etsyShop, jobId = null) => {
     const syncedEtsyIds = []; // Track which listing IDs still exist on Etsy
 
     // Etsy API only accepts a single state enum value, so fetch active and draft separately
-    const statesToSync = ['active', 'draft'];
+    const statesToSync = ['active', 'draft', 'inactive'];
 
     for (const listingState of statesToSync) {
       let offset = 0;
@@ -97,6 +97,7 @@ const syncListings = async (etsyShop, jobId = null) => {
               taxonomyPath: listing.category_path || [],
               images: [], // Images fetched separately if needed
               isDigital: listing.listing_type === 'download' || listing.listing_type === 'both',
+              featuredRank: listing.featured_rank || 0,
               shippingProfile: listing.shipping_profile_id ? String(listing.shipping_profile_id) : null,
               processingMin: listing.processing_min || null,
               processingMax: listing.processing_max || null,

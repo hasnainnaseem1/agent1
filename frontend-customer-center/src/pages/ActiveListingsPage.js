@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card, Table, Typography, Tag, Row, Col, Statistic,
-  Button, theme, Input, message, Empty, Spin, Space, Popconfirm,
+  Button, theme, Input, message, Empty, Spin, Space, Popconfirm, Tooltip,
 } from 'antd';
 import {
   ShopOutlined, CheckCircleOutlined,
   ExclamationCircleOutlined, SearchOutlined, ReloadOutlined,
   EyeOutlined, ExportOutlined, PlusOutlined, SendOutlined,
-  EditOutlined, UploadOutlined, PauseCircleOutlined,
+  EditOutlined, PauseCircleOutlined,
+  StarOutlined, StarFilled,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -39,6 +40,8 @@ const ActiveListingsPage = () => {
   const [uploading, setUploading] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [deactivating, setDeactivating] = useState(null);
+  const [reactivating, setReactivating] = useState(null);
+  const [featuring, setFeaturing] = useState(null);
 
   const handleFileUpload = (listingId, autoPublish = false) => {
     return new Promise((resolve) => {
@@ -115,6 +118,41 @@ const ActiveListingsPage = () => {
     }
   };
 
+  const handleReactivate = async (listingId) => {
+    setReactivating(listingId);
+    try {
+      await etsyApi.publishListing(listingId);
+      message.success('Listing reactivated successfully!');
+      fetchListings();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to reactivate listing');
+    } finally {
+      setReactivating(null);
+    }
+  };
+
+  const handleToggleFeatured = async (listingId, currentRank) => {
+    const isFeatured = currentRank > 0;
+    if (!isFeatured) {
+      // Check max 4 featured
+      const featuredCount = listings.filter(l => l.featuredRank > 0).length;
+      if (featuredCount >= 4) {
+        message.warning('You can only feature up to 4 listings at a time');
+        return;
+      }
+    }
+    setFeaturing(listingId);
+    try {
+      await etsyApi.featureListing(listingId, isFeatured ? 0 : 1);
+      message.success(isFeatured ? 'Listing unfeatured' : 'Listing featured!');
+      fetchListings();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to update featured status');
+    } finally {
+      setFeaturing(null);
+    }
+  };
+
   const card = {
     borderRadius: radii.lg,
     border: `1px solid ${isDark ? colors.darkBorder : colors.lightBorder}`,
@@ -184,6 +222,7 @@ const ActiveListingsPage = () => {
         status: l.state || 'active',
         price: l.price,
         isDigital: l.isDigital || false,
+        featuredRank: l.featuredRank || 0,
       }));
       setListings(rows);
     } catch (err) {
@@ -253,9 +292,21 @@ const ActiveListingsPage = () => {
       ),
     },
     {
-      title: '', key: 'action', width: 320, align: 'center',
+      title: '', key: 'action', width: 380, align: 'center',
       render: (_, record) => (
         <Space size={4}>
+          {record.listingId && record.status === 'active' && getFeatureAccess('edit_listing').state === 'unlocked' && (
+            <Tooltip title={record.featuredRank > 0 ? 'Unfeatured' : 'Feature this listing'}>
+              <Button
+                size="small"
+                type="text"
+                icon={record.featuredRank > 0 ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+                loading={featuring === record.listingId}
+                onClick={() => handleToggleFeatured(record.listingId, record.featuredRank)}
+                style={{ borderRadius: radii.pill }}
+              />
+            </Tooltip>
+          )}
           {record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
             <Button
               size="small"
@@ -285,16 +336,23 @@ const ActiveListingsPage = () => {
               </Button>
             </Popconfirm>
           )}
-          {record.status === 'draft' && record.isDigital && (
-            <Button
-              size="small"
-              icon={<UploadOutlined />}
-              loading={uploading === record.listingId}
-              onClick={() => handleFileUpload(record.listingId)}
-              style={{ borderRadius: radii.pill, fontSize: 12 }}
+          {record.status === 'inactive' && record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
+            <Popconfirm
+              title="Reactivate this listing?"
+              description="The listing will be visible on your Etsy shop again."
+              onConfirm={() => handleReactivate(record.listingId)}
+              okText="Reactivate"
+              cancelText="Cancel"
             >
-              Upload File
-            </Button>
+              <Button
+                type="primary" size="small"
+                icon={<CheckCircleOutlined />}
+                loading={reactivating === record.listingId}
+                style={{ background: colors.success, borderColor: colors.success, borderRadius: radii.pill, fontSize: 12 }}
+              >
+                Reactivate
+              </Button>
+            </Popconfirm>
           )}
           {record.status === 'draft' && (
             <Button

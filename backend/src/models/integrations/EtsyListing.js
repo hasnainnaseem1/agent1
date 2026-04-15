@@ -103,6 +103,13 @@ const etsyListingSchema = new mongoose.Schema({
     default: false
   },
 
+  // Featured rank (0 = not featured, 1-4 = featured position)
+  featuredRank: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+
   // Shop attributes relevant to audit scoring
   shippingProfile: {
     freeShipping: { type: Boolean, default: false },

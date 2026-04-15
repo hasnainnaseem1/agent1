@@ -76,6 +76,9 @@ const etsyApi = {
   // Publish a draft listing
   publishListing: (listingId) => axiosInstance.put(`/api/v1/customer/etsy/listings/${listingId}/publish`).then(r => r.data),
 
+  // Feature / un-feature a listing
+  featureListing: (listingId, rank) => axiosInstance.patch(`/api/v1/customer/etsy/listings/${listingId}`, { featured_rank: rank }).then(r => r.data),
+
   // Get taxonomy properties (craft type, occasion, etc.) for a category
   getTaxonomyProperties: (taxonomyId) => axiosInstance.get(`/api/v1/customer/etsy/taxonomy/${taxonomyId}/properties`).then(r => r.data),
 

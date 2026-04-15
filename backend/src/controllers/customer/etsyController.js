@@ -232,6 +232,7 @@ const getListings = async (req, res) => {
           tags: l.tags,
           images: l.images,
           isDigital: l.isDigital || false,
+          featuredRank: l.featuredRank || 0,
           url: `https://www.etsy.com/listing/${l.etsyListingId}`,
           createdAt: l.originalCreatedAt,
           updatedAt: l.updatedAt,
@@ -907,7 +908,7 @@ const updateListing = async (req, res) => {
     const {
       title, description, price, quantity, taxonomyId,
       whoMade, whenMade, isSupply, shippingProfileId,
-      tags, materials, imageIds, state,
+      tags, materials, imageIds, state, featured_rank,
       isPersonalizable, personalizationIsRequired,
       personalizationCharCountMax, personalizationInstructions,
     } = req.body;
@@ -927,6 +928,12 @@ const updateListing = async (req, res) => {
     // Listing state — Etsy allows 'active' or 'inactive' for updates
     if (state !== undefined && (state === 'active' || state === 'inactive')) {
       body.state = state;
+    }
+
+    // Featured rank — 0 to un-feature, 1+ to feature
+    if (featured_rank !== undefined) {
+      const rank = parseInt(featured_rank, 10);
+      if (!isNaN(rank) && rank >= 0) body.featured_rank = rank;
     }
 
     // Image reordering — pass image_ids to set new image order
@@ -1054,6 +1061,7 @@ const updateListing = async (req, res) => {
       if (updated.materials) dbUpdate.materials = updated.materials;
       if (updated.taxonomy_id) dbUpdate.taxonomyId = updated.taxonomy_id;
       if (updated.state) dbUpdate.state = updated.state;
+      if (updated.featured_rank !== undefined) dbUpdate.featuredRank = updated.featured_rank;
     }
     if (price !== undefined) dbUpdate.price = parseFloat(price);
     if (quantity !== undefined) dbUpdate.quantity = parseInt(quantity, 10);
