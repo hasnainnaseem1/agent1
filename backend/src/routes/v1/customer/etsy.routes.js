@@ -101,6 +101,16 @@ router.delete('/listings/:listingId/videos/:videoId', checkShopConnection, etsyC
 // @access  Private — requires shop connection
 router.post('/listings/:listingId/files', checkShopConnection, upload.single('file'), etsyController.uploadListingFile);
 
+// @route   GET /api/v1/customer/etsy/listings/:listingId/files
+// @desc    Get all digital files for an Etsy listing
+// @access  Private — requires shop connection
+router.get('/listings/:listingId/files', checkShopConnection, etsyController.getListingFiles);
+
+// @route   DELETE /api/v1/customer/etsy/listings/:listingId/files/:fileId
+// @desc    Delete a digital file from an Etsy listing
+// @access  Private — requires shop connection
+router.delete('/listings/:listingId/files/:fileId', checkShopConnection, etsyController.deleteListingFile);
+
 // @route   PUT /api/v1/customer/etsy/listings/:listingId/publish
 // @desc    Publish a draft listing (state → active)
 // @access  Private — requires shop connection

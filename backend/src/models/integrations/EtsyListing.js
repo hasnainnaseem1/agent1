@@ -76,7 +76,7 @@ const etsyListingSchema = new mongoose.Schema({
   // Listing state
   state: {
     type: String,
-    enum: ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed'],
+    enum: ['active', 'inactive', 'sold_out', 'draft', 'expired', 'removed', 'edit'],
     default: 'active',
     index: true
   },

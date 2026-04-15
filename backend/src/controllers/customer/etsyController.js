@@ -726,6 +726,76 @@ const uploadListingFile = async (req, res) => {
 };
 
 /**
+ * GET /api/v1/customer/etsy/listings/:listingId/files
+ * Get all digital files for an Etsy listing.
+ */
+const getListingFiles = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId } = req.params;
+
+    const result = await etsyApi.authenticatedRequest(shop, 'GET',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/files`
+    );
+
+    if (!result.success) {
+      log.error('Get listing files failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to fetch listing files' });
+    }
+
+    const files = (result.data?.results || []).map(f => ({
+      listing_file_id: f.listing_file_id,
+      listing_id: f.listing_id,
+      rank: f.rank,
+      filename: f.filename,
+      filesize: f.filesize,
+      size_bytes: f.size_bytes,
+      filetype: f.filetype,
+      create_timestamp: f.create_timestamp || f.created_timestamp,
+    }));
+
+    return res.json({ success: true, data: { files } });
+  } catch (error) {
+    log.error('Get listing files error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to fetch listing files' });
+  }
+};
+
+/**
+ * DELETE /api/v1/customer/etsy/listings/:listingId/files/:fileId
+ * Delete a digital file from an Etsy listing.
+ * Note: Deleting the last file converts the listing from digital to physical.
+ */
+const deleteListingFile = async (req, res) => {
+  try {
+    const shop = req.etsyShop;
+    if (!shop) {
+      return res.status(403).json({ success: false, message: 'Shop connection required' });
+    }
+
+    const { listingId, fileId } = req.params;
+
+    const result = await etsyApi.authenticatedRequest(shop, 'DELETE',
+      `/v3/application/shops/${shop.shopId}/listings/${listingId}/files/${fileId}`
+    );
+
+    if (!result.success && result.status !== 204) {
+      log.error('Delete listing file failed:', result.error);
+      return res.status(502).json({ success: false, message: result.error || 'Failed to delete file' });
+    }
+
+    return res.json({ success: true, message: 'File deleted successfully' });
+  } catch (error) {
+    log.error('Delete listing file error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to delete file' });
+  }
+};
+
+/**
  * PUT /api/v1/customer/etsy/listings/:listingId/publish
  * Publish a draft listing (change state to active).
  */
@@ -996,6 +1066,11 @@ const updateListing = async (req, res) => {
       }
 
       updated = result.data;
+
+      // Log featured_rank for debugging
+      if (featured_rank !== undefined) {
+        log.info(`Featured rank update — sent: ${featured_rank}, Etsy returned: ${updated?.featured_rank}`);
+      }
     }
 
     // Update price/quantity via Inventory API
@@ -1228,6 +1303,8 @@ module.exports = {
   uploadListingImage,
   deleteListingImage,
   uploadListingFile,
+  getListingFiles,
+  deleteListingFile,
   uploadListingVideo,
   deleteListingVideo,
   publishListing,

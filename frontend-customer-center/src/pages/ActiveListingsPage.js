@@ -9,6 +9,7 @@ import {
   EyeOutlined, ExportOutlined, PlusOutlined, SendOutlined,
   EditOutlined, PauseCircleOutlined,
   StarOutlined, StarFilled,
+  UploadOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../components/AppLayout';
 import FeatureGate from '../components/common/FeatureGate';
@@ -279,17 +280,27 @@ const ActiveListingsPage = () => {
         { text: 'Active', value: 'active' },
         { text: 'Inactive', value: 'inactive' },
         { text: 'Draft', value: 'draft' },
+        { text: 'Edit', value: 'edit' },
+        { text: 'Sold Out', value: 'sold_out' },
+        { text: 'Expired', value: 'expired' },
       ],
       onFilter: (value, record) => record.status === value,
-      render: (s) => (
-        <Tag
-          icon={s === 'active' ? <CheckCircleOutlined /> : s === 'draft' ? <EditOutlined /> : s === 'inactive' ? <PauseCircleOutlined /> : <ExclamationCircleOutlined />}
-          color={s === 'active' ? 'green' : s === 'draft' ? 'orange' : s === 'inactive' ? 'red' : 'default'}
-          style={{ borderRadius: radii.pill }}
-        >
-          {s}
-        </Tag>
-      ),
+      render: (s) => {
+        const cfg = {
+          active: { icon: <CheckCircleOutlined />, color: 'green' },
+          draft: { icon: <EditOutlined />, color: 'orange' },
+          inactive: { icon: <PauseCircleOutlined />, color: 'red' },
+          edit: { icon: <EditOutlined />, color: 'orange' },
+          sold_out: { icon: <ExclamationCircleOutlined />, color: 'volcano' },
+          expired: { icon: <ExclamationCircleOutlined />, color: 'default' },
+        };
+        const { icon, color } = cfg[s] || { icon: <ExclamationCircleOutlined />, color: 'default' };
+        return (
+          <Tag icon={icon} color={color} style={{ borderRadius: radii.pill }}>
+            {s === 'sold_out' ? 'sold out' : s}
+          </Tag>
+        );
+      },
     },
     {
       title: '', key: 'action', width: 380, align: 'center',
@@ -336,7 +347,7 @@ const ActiveListingsPage = () => {
               </Button>
             </Popconfirm>
           )}
-          {record.status === 'inactive' && record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
+          {!['active', 'draft'].includes(record.status) && record.listingId && getFeatureAccess('edit_listing').state === 'unlocked' && (
             <Popconfirm
               title="Reactivate this listing?"
               description="The listing will be visible on your Etsy shop again."
@@ -353,6 +364,17 @@ const ActiveListingsPage = () => {
                 Reactivate
               </Button>
             </Popconfirm>
+          )}
+          {record.status === 'draft' && record.isDigital && (
+            <Button
+              size="small"
+              icon={<UploadOutlined />}
+              loading={uploading === record.listingId}
+              onClick={() => handleFileUpload(record.listingId)}
+              style={{ borderRadius: radii.pill, fontSize: 12 }}
+            >
+              Upload File
+            </Button>
           )}
           {record.status === 'draft' && (
             <Button

@@ -7,7 +7,7 @@ import {
 import {
   EditOutlined, TagsOutlined, DollarOutlined, PictureOutlined,
   PlusOutlined, DeleteOutlined, VideoCameraOutlined, CloseCircleFilled,
-  PlayCircleOutlined,
+  PlayCircleOutlined, FileOutlined, UploadOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 import { colors, radii } from '../theme/tokens';
@@ -58,13 +58,17 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const [listingData, setListingData] = useState(null);
   const [existingImages, setExistingImages] = useState([]);
   const [existingVideos, setExistingVideos] = useState([]);
+  const [existingFiles, setExistingFiles] = useState([]);
   const [imageUploading, setImageUploading] = useState(false);
   const [videoUploading, setVideoUploading] = useState(false);
+  const [fileUploading, setFileUploading] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState(null);
   const [deletingVideoId, setDeletingVideoId] = useState(null);
+  const [deletingFileId, setDeletingFileId] = useState(null);
   const imageInputRef = useRef(null);
   const replaceInputRef = useRef(null);
   const videoInputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const [replaceIndex, setReplaceIndex] = useState(null);
   const [mediaChanged, setMediaChanged] = useState(false);
   const [imageOrderChanged, setImageOrderChanged] = useState(false);
@@ -80,6 +84,13 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
         setListingData(d);
         setExistingImages(d.images || []);
         setExistingVideos(d.videos || []);
+
+        // Fetch digital files if digital listing
+        if (d.isDigital) {
+          etsyApi.getListingFiles(listingId)
+            .then(fRes => setExistingFiles(fRes.data?.files || []))
+            .catch(() => setExistingFiles([]));
+        }
 
         // Pre-fill form
         form.setFieldsValue({
@@ -150,6 +161,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     setListingData(null);
     setExistingImages([]);
     setExistingVideos([]);
+    setExistingFiles([]);
     setTaxonomyProperties([]);
     setPropertyValues([]);
     setReplaceIndex(null);
@@ -277,6 +289,41 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const onVideoFile = (e) => {
     const file = e.target.files?.[0];
     if (file) handleVideoUpload(file);
+    e.target.value = '';
+  };
+
+  // Digital file handlers
+  const handleDigitalFileUpload = async (file) => {
+    setFileUploading(true);
+    try {
+      await etsyApi.uploadListingFile(listingId, file);
+      message.success(`File "${file.name}" uploaded successfully!`);
+      // Refresh file list
+      const fRes = await etsyApi.getListingFiles(listingId);
+      setExistingFiles(fRes.data?.files || []);
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to upload file');
+    } finally {
+      setFileUploading(false);
+    }
+  };
+
+  const handleDeleteFile = async (fileId) => {
+    setDeletingFileId(fileId);
+    try {
+      await etsyApi.deleteListingFile(listingId, fileId);
+      setExistingFiles(prev => prev.filter(f => f.listing_file_id !== fileId));
+      message.success('File deleted');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to delete file');
+    } finally {
+      setDeletingFileId(null);
+    }
+  };
+
+  const onDigitalFile = (e) => {
+    const file = e.target.files?.[0];
+    if (file) handleDigitalFileUpload(file);
     e.target.value = '';
   };
 
@@ -801,6 +848,79 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
               Videos may take a few minutes to process after upload. Supported: MP4, MOV, AVI, WebM.
             </Text>
           </div>
+
+          {/* Digital Files Section */}
+          {listingData?.isDigital && (
+            <>
+              <Divider style={{ margin: '16px 0 12px' }} />
+              <div style={{ marginBottom: 8 }}>
+                <Text strong style={{ fontSize: 14 }}>
+                  <FileOutlined style={{ marginRight: 6, color: BRAND }} />
+                  Digital Files
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                  Files buyers will download after purchase
+                </Text>
+              </div>
+
+              {existingFiles.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  {existingFiles.map(f => (
+                    <div
+                      key={f.listing_file_id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', borderRadius: 8, marginBottom: 6,
+                        border: `1px solid ${isDark ? '#333' : '#e8e8e8'}`,
+                        background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+                        <FileOutlined style={{ fontSize: 18, color: BRAND, flexShrink: 0 }} />
+                        <div style={{ overflow: 'hidden' }}>
+                          <Text style={{ fontSize: 13, display: 'block' }} ellipsis>{f.filename}</Text>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            {f.filesize || (f.size_bytes ? `${(f.size_bytes / 1024 / 1024).toFixed(1)} MB` : '')}
+                            {f.filetype ? ` · ${f.filetype.toUpperCase()}` : ''}
+                          </Text>
+                        </div>
+                      </div>
+                      <Popconfirm
+                        title="Delete this file?"
+                        description={existingFiles.length === 1 ? 'Warning: Deleting the last file will convert this listing to a physical listing.' : undefined}
+                        onConfirm={() => handleDeleteFile(f.listing_file_id)}
+                        okText="Delete"
+                        cancelText="Cancel"
+                        okButtonProps={{ danger: true }}
+                      >
+                        <Button
+                          type="text" size="small" danger
+                          icon={<DeleteOutlined />}
+                          loading={deletingFileId === f.listing_file_id}
+                        />
+                      </Popconfirm>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <Button
+                icon={<UploadOutlined />}
+                onClick={() => fileInputRef.current?.click()}
+                loading={fileUploading}
+                style={{ borderRadius: radii.sm }}
+              >
+                {existingFiles.length > 0 ? 'Add Another File' : 'Upload Digital File'}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".zip,.pdf,.epub,.jpg,.jpeg,.png,.gif,.svg,.psd,.ai,.doc,.docx,.xls,.xlsx,.mp3,.wav,.mp4,.mov,.txt,.csv"
+                style={{ display: 'none' }}
+                onChange={onDigitalFile}
+              />
+            </>
+          )}
         </>
       ),
     },

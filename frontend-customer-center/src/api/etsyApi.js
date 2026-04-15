@@ -67,6 +67,14 @@ const etsyApi = {
     }).then(r => r.data);
   },
 
+  // Get all digital files for a listing
+  getListingFiles: (listingId) =>
+    axiosInstance.get(`/api/v1/customer/etsy/listings/${listingId}/files`).then(r => r.data),
+
+  // Delete a digital file from a listing
+  deleteListingFile: (listingId, fileId) =>
+    axiosInstance.delete(`/api/v1/customer/etsy/listings/${listingId}/files/${fileId}`).then(r => r.data),
+
   // Get shipping profiles
   getShippingProfiles: () => axiosInstance.get('/api/v1/customer/etsy/shipping-profiles').then(r => r.data),
 
