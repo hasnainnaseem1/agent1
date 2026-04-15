@@ -311,14 +311,13 @@ const ActiveListingsPage = () => {
       render: (_, record) => (
         <Space size={4}>
           {record.listingId && record.status === 'active' && getFeatureAccess('edit_listing').state === 'unlocked' && (
-            <Tooltip title={record.featuredRank > 0 ? 'Unfeatured' : 'Feature this listing'}>
+            <Tooltip title="Feature/unfeature is temporarily unavailable via Etsy API. Use Etsy Shop Manager instead.">
               <Button
                 size="small"
                 type="text"
-                icon={record.featuredRank > 0 ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
-                loading={featuring === record.listingId}
-                onClick={() => handleToggleFeatured(record.listingId, record.featuredRank)}
-                style={{ borderRadius: radii.pill }}
+                icon={record.featuredRank > 0 ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined style={{ color: '#d9d9d9' }} />}
+                disabled
+                style={{ borderRadius: radii.pill, cursor: 'not-allowed' }}
               />
             </Tooltip>
           )}
