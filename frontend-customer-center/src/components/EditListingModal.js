@@ -75,6 +75,15 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
   const [dragIndex, setDragIndex] = useState(null);
   const [isDigital, setIsDigital] = useState(false);
 
+  // Pending media operations — deferred until "Update Listing" is clicked
+  const [pendingImageUploads, setPendingImageUploads] = useState([]);
+  const [pendingImageDeletes, setPendingImageDeletes] = useState([]);
+  const [pendingImageReplace, setPendingImageReplace] = useState([]);
+  const [pendingVideoUpload, setPendingVideoUpload] = useState(null);
+  const [pendingVideoDeletes, setPendingVideoDeletes] = useState([]);
+  const [pendingFileUploads, setPendingFileUploads] = useState([]);
+  const [pendingFileDeletes, setPendingFileDeletes] = useState([]);
+
   // Load listing data when modal opens
   useEffect(() => {
     if (!open || !listingId) return;
@@ -171,67 +180,48 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     setImageOrderChanged(false);
     setDragIndex(null);
     setIsDigital(false);
+    // Clean up pending operations and blob URLs
+    pendingImageUploads.forEach(p => URL.revokeObjectURL(p.blobUrl));
+    setPendingImageUploads([]);
+    setPendingImageDeletes([]);
+    pendingImageReplace.forEach(p => URL.revokeObjectURL(p.blobUrl));
+    setPendingImageReplace([]);
+    if (pendingVideoUpload) URL.revokeObjectURL(pendingVideoUpload.blobUrl);
+    setPendingVideoUpload(null);
+    setPendingVideoDeletes([]);
+    setPendingFileUploads([]);
+    setPendingFileDeletes([]);
   };
 
-  // --- Image handlers ---
-  const handleImageUpload = async (file) => {
-    if (!file || !listingId) return;
-    setImageUploading(true);
-    try {
-      const res = await etsyApi.uploadListingImage(listingId, file);
-      if (res.success) {
-        message.success('Image uploaded');
-        setMediaChanged(true);
-        // Refresh listing to get updated images
-        const refreshed = await etsyApi.getListingById(listingId);
-        setExistingImages(refreshed.data?.images || []);
-      } else {
-        message.error(res.message || 'Upload failed');
-      }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to upload image');
-    } finally {
-      setImageUploading(false);
-    }
+  // --- Image handlers (deferred — queued until save) ---
+  const handleImageUpload = (file) => {
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    setPendingImageUploads(prev => [...prev, { file, blobUrl }]);
+    setMediaChanged(true);
   };
 
-  const handleImageDelete = async (imageId) => {
-    if (!imageId || !listingId) return;
-    setDeletingImageId(imageId);
-    try {
-      const res = await etsyApi.deleteListingImage(listingId, imageId);
-      if (res.success) {
-        message.success('Image deleted');
-        setMediaChanged(true);
-        setExistingImages(prev => prev.filter(img => img.listing_image_id !== imageId));
-      } else {
-        message.error(res.message || 'Delete failed');
-      }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to delete image');
-    } finally {
-      setDeletingImageId(null);
+  const handleImageDelete = (imageId) => {
+    if (!imageId) return;
+    const pendingIdx = pendingImageUploads.findIndex(p => p.blobUrl === imageId);
+    if (pendingIdx !== -1) {
+      URL.revokeObjectURL(pendingImageUploads[pendingIdx].blobUrl);
+      setPendingImageUploads(prev => prev.filter((_, i) => i !== pendingIdx));
+    } else {
+      setPendingImageDeletes(prev => [...prev, imageId]);
     }
+    setMediaChanged(true);
   };
 
-  const handleImageReplace = async (file, imageToReplace) => {
-    if (!file || !listingId || !imageToReplace) return;
-    setImageUploading(true);
-    try {
-      // Delete old image first, then upload new one
-      await etsyApi.deleteListingImage(listingId, imageToReplace.listing_image_id);
-      await etsyApi.uploadListingImage(listingId, file);
-      message.success('Image replaced');
-      setMediaChanged(true);
-      // Refresh listing to get updated images
-      const refreshed = await etsyApi.getListingById(listingId);
-      setExistingImages(refreshed.data?.images || []);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to replace image');
-    } finally {
-      setImageUploading(false);
-      setReplaceIndex(null);
-    }
+  const handleImageReplace = (file, imageToReplace) => {
+    if (!file || !imageToReplace) return;
+    const blobUrl = URL.createObjectURL(file);
+    setPendingImageReplace(prev => [
+      ...prev.filter(r => r.imageId !== imageToReplace.listing_image_id),
+      { imageId: imageToReplace.listing_image_id, file, blobUrl },
+    ]);
+    setMediaChanged(true);
+    setReplaceIndex(null);
   };
 
   const onAddImageFile = (e) => {
@@ -248,45 +238,24 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     e.target.value = '';
   };
 
-  // --- Video handlers ---
-  const handleVideoUpload = async (file) => {
-    if (!file || !listingId) return;
-    setVideoUploading(true);
-    try {
-      const res = await etsyApi.uploadListingVideo(listingId, file);
-      if (res.success) {
-        message.success('Video uploaded — it may take a few minutes to process on Etsy');
-        setMediaChanged(true);
-        if (res.data) {
-          setExistingVideos(prev => [...prev, res.data]);
-        }
-      } else {
-        message.error(res.message || 'Upload failed');
-      }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to upload video');
-    } finally {
-      setVideoUploading(false);
-    }
+  // --- Video handlers (deferred) ---
+  const handleVideoUpload = (file) => {
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    if (pendingVideoUpload) URL.revokeObjectURL(pendingVideoUpload.blobUrl);
+    setPendingVideoUpload({ file, blobUrl });
+    setMediaChanged(true);
   };
 
-  const handleVideoDelete = async (videoId) => {
-    if (!videoId || !listingId) return;
-    setDeletingVideoId(videoId);
-    try {
-      const res = await etsyApi.deleteListingVideo(listingId, videoId);
-      if (res.success) {
-        message.success('Video deleted');
-        setMediaChanged(true);
-        setExistingVideos(prev => prev.filter(v => v.video_id !== videoId));
-      } else {
-        message.error(res.message || 'Delete failed');
-      }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to delete video');
-    } finally {
-      setDeletingVideoId(null);
+  const handleVideoDelete = (videoId) => {
+    if (!videoId) return;
+    if (videoId === 'pending' && pendingVideoUpload) {
+      URL.revokeObjectURL(pendingVideoUpload.blobUrl);
+      setPendingVideoUpload(null);
+    } else {
+      setPendingVideoDeletes(prev => [...prev, videoId]);
     }
+    setMediaChanged(true);
   };
 
   const onVideoFile = (e) => {
@@ -295,35 +264,20 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
     e.target.value = '';
   };
 
-  // Digital file handlers
-  const handleDigitalFileUpload = async (file) => {
-    setFileUploading(true);
-    try {
-      await etsyApi.uploadListingFile(listingId, file);
-      message.success(`File "${file.name}" uploaded successfully!`);
-      setMediaChanged(true);
-      // Refresh file list
-      const fRes = await etsyApi.getListingFiles(listingId);
-      setExistingFiles(fRes.data?.files || []);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to upload file');
-    } finally {
-      setFileUploading(false);
-    }
+  // --- Digital file handlers (deferred) ---
+  const handleDigitalFileUpload = (file) => {
+    setPendingFileUploads(prev => [...prev, file]);
+    setMediaChanged(true);
   };
 
-  const handleDeleteFile = async (fileId) => {
-    setDeletingFileId(fileId);
-    try {
-      await etsyApi.deleteListingFile(listingId, fileId);
-      setExistingFiles(prev => prev.filter(f => f.listing_file_id !== fileId));
-      setMediaChanged(true);
-      message.success('File deleted');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to delete file');
-    } finally {
-      setDeletingFileId(null);
+  const handleDeleteFile = (fileId) => {
+    if (typeof fileId === 'string' && fileId.startsWith('pending-')) {
+      const idx = parseInt(fileId.replace('pending-', ''), 10);
+      setPendingFileUploads(prev => prev.filter((_, i) => i !== idx));
+    } else {
+      setPendingFileDeletes(prev => [...prev, fileId]);
     }
+    setMediaChanged(true);
   };
 
   const onDigitalFile = (e) => {
@@ -469,6 +423,37 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
         }
       }
 
+      // Execute pending media operations
+      let mediaErrors = 0;
+      for (const imageId of pendingImageDeletes) {
+        try { await etsyApi.deleteListingImage(listingId, imageId); } catch { mediaErrors++; }
+      }
+      for (const rep of pendingImageReplace) {
+        try {
+          await etsyApi.deleteListingImage(listingId, rep.imageId);
+          await etsyApi.uploadListingImage(listingId, rep.file);
+        } catch { mediaErrors++; }
+      }
+      for (const pending of pendingImageUploads) {
+        try { await etsyApi.uploadListingImage(listingId, pending.file); } catch { mediaErrors++; }
+      }
+      for (const videoId of pendingVideoDeletes) {
+        try { await etsyApi.deleteListingVideo(listingId, videoId); } catch { mediaErrors++; }
+      }
+      if (pendingVideoUpload) {
+        try { await etsyApi.uploadListingVideo(listingId, pendingVideoUpload.file); } catch { mediaErrors++; }
+      }
+      for (const fileId of pendingFileDeletes) {
+        try { await etsyApi.deleteListingFile(listingId, fileId); } catch { mediaErrors++; }
+      }
+      for (const file of pendingFileUploads) {
+        try { await etsyApi.uploadListingFile(listingId, file); } catch { mediaErrors++; }
+      }
+
+      if (mediaErrors > 0) {
+        message.warning(`${mediaErrors} media operation(s) failed — please check your listing`);
+      }
+
       message.success('Listing updated successfully!');
       onSuccess?.();
       handleClose();
@@ -481,6 +466,38 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
 
   const cardBg = isDark ? 'rgba(108,99,255,0.04)' : 'rgba(108,99,255,0.02)';
   const borderColor = isDark ? colors.darkBorder : colors.lightBorder;
+
+  // Compute display arrays — existing state combined with pending operations
+  const displayImages = [
+    ...existingImages
+      .filter(img => !pendingImageDeletes.includes(img.listing_image_id))
+      .map(img => {
+        const rep = pendingImageReplace.find(r => r.imageId === img.listing_image_id);
+        return rep ? { ...img, url: rep.blobUrl, url_170x135: rep.blobUrl, url_75x75: rep.blobUrl, _isReplaced: true } : img;
+      }),
+    ...pendingImageUploads.map(p => ({
+      listing_image_id: p.blobUrl,
+      url: p.blobUrl, url_170x135: p.blobUrl, url_75x75: p.blobUrl,
+      _isPending: true,
+    })),
+  ];
+
+  const displayVideos = [
+    ...existingVideos.filter(v => !pendingVideoDeletes.includes(v.video_id)),
+    ...(pendingVideoUpload ? [{
+      video_id: 'pending', thumbnail_url: '', video_url: pendingVideoUpload.blobUrl,
+      video_state: 'pending', _isPending: true,
+    }] : []),
+  ];
+
+  const displayFiles = [
+    ...existingFiles.filter(f => !pendingFileDeletes.includes(f.listing_file_id)),
+    ...pendingFileUploads.map((f, idx) => ({
+      listing_file_id: `pending-${idx}`,
+      filename: f.name, size_bytes: f.size,
+      filetype: f.name.split('.').pop(), _isPending: true,
+    })),
+  ];
 
   const steps = [
     {
@@ -607,18 +624,19 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
           }}>
             <Text strong style={{ display: 'block', marginBottom: 10 }}>
               <PictureOutlined style={{ marginRight: 6, color: BRAND }} />
-              Photos ({existingImages.length}/{MAX_IMAGES})
+              Photos ({displayImages.length}/{MAX_IMAGES})
             </Text>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
               {Array.from({ length: MAX_IMAGES }).map((_, i) => {
-                const img = existingImages[i];
+                const img = displayImages[i];
                 if (img) {
                   // Filled slot — show image with overlay actions + drag to reorder
                   return (
                     <div
                       key={img.listing_image_id || i}
-                      draggable
+                      draggable={!img._isPending && !img._isReplaced}
                       onDragStart={(e) => {
+                        if (img._isPending || img._isReplaced) return;
                         setDragIndex(i);
                         e.dataTransfer.effectAllowed = 'move';
                       }}
@@ -629,6 +647,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                       onDrop={(e) => {
                         e.preventDefault();
                         if (dragIndex === null || dragIndex === i) return;
+                        if (displayImages[dragIndex]?._isPending || img._isPending) return;
                         const reordered = [...existingImages];
                         const [moved] = reordered.splice(dragIndex, 1);
                         reordered.splice(i, 0, moved);
@@ -669,7 +688,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                             type="text" size="small"
                             icon={<EditOutlined style={{ color: '#fff', fontSize: 13 }} />}
                             style={{ minWidth: 0, padding: '0 6px' }}
-                            disabled={imageUploading}
+                            disabled={img._isPending}
                             onClick={() => {
                               setReplaceIndex(i);
                               replaceInputRef.current?.click();
@@ -687,8 +706,8 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                               type="text" size="small"
                               icon={<DeleteOutlined style={{ color: '#ff4d4f', fontSize: 13 }} />}
                               style={{ minWidth: 0, padding: '0 6px' }}
-                              loading={deletingImageId === img.listing_image_id}
-                              disabled={imageUploading}
+                              loading={false}
+                              disabled={false}
                             />
                           </Tooltip>
                         </Popconfirm>
@@ -700,28 +719,22 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                 return (
                   <div
                     key={`empty-${i}`}
-                    onClick={() => !imageUploading && existingImages.length < MAX_IMAGES && imageInputRef.current?.click()}
+                    onClick={() => displayImages.length < MAX_IMAGES && imageInputRef.current?.click()}
                     style={{
                       width: '100%', aspectRatio: '1',
                       borderRadius: 8,
                       border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
                       display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center',
-                      cursor: imageUploading ? 'not-allowed' : 'pointer',
+                      cursor: 'pointer',
                       transition: 'border-color 0.2s',
                       background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
                     }}
-                    onMouseEnter={e => { if (!imageUploading) e.currentTarget.style.borderColor = BRAND; }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = BRAND}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
                   >
-                    {imageUploading && i === existingImages.length ? (
-                      <Spin size="small" />
-                    ) : (
-                      <>
-                        <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
-                        <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Add</Text>
-                      </>
-                    )}
+                    <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
+                    <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Add</Text>
                   </div>
                 );
               })}
@@ -753,11 +766,11 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
           }}>
             <Text strong style={{ display: 'block', marginBottom: 10 }}>
               <VideoCameraOutlined style={{ marginRight: 6, color: BRAND }} />
-              Video {existingVideos.length > 0 ? `(${existingVideos.length})` : ''}
+              Video {displayVideos.length > 0 ? `(${displayVideos.length})` : ''}
             </Text>
-            {existingVideos.length > 0 ? (
+            {displayVideos.length > 0 ? (
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                {existingVideos.map(v => (
+                {displayVideos.map(v => (
                   <div key={v.video_id} style={{
                     position: 'relative', width: 140, height: 100,
                     borderRadius: 8, overflow: 'hidden',
@@ -784,11 +797,11 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                       fontSize: 28, color: 'rgba(255,255,255,0.85)',
                       pointerEvents: 'none',
                     }} />
-                    {v.video_state && v.video_state !== 'active' && (
-                      <Tag color="orange" style={{
-                        position: 'absolute', top: 4, left: 4, fontSize: 10,
-                      }}>Processing</Tag>
-                    )}
+                    {v._isPending ? (
+                      <Tag color="blue" style={{ position: 'absolute', top: 4, left: 4, fontSize: 10 }}>Pending</Tag>
+                    ) : v.video_state && v.video_state !== 'active' ? (
+                      <Tag color="orange" style={{ position: 'absolute', top: 4, left: 4, fontSize: 10 }}>Processing</Tag>
+                    ) : null}
                     <Popconfirm
                       title="Delete this video?"
                       onConfirm={() => handleVideoDelete(v.video_id)}
@@ -797,8 +810,8 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                     >
                       <Button
                         type="text" size="small"
-                        loading={deletingVideoId === v.video_id}
-                        icon={<CloseCircleFilled style={{ color: '#ff4d4f', fontSize: 16 }} />}
+                        loading={false}
+                        icon={<CloseCircleFilled style={{ color: v._isPending ? '#999' : '#ff4d4f', fontSize: 16 }} />}
                         style={{
                           position: 'absolute', top: 2, right: 2,
                           minWidth: 0, padding: 0, width: 22, height: 22,
@@ -811,47 +824,39 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                 ))}
                 {/* Add another video slot */}
                 <div
-                  onClick={() => !videoUploading && videoInputRef.current?.click()}
+                  onClick={() => videoInputRef.current?.click()}
                   style={{
                     width: 140, height: 100, borderRadius: 8,
                     border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
-                    cursor: videoUploading ? 'not-allowed' : 'pointer',
+                    cursor: 'pointer',
                     background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
                   }}
-                  onMouseEnter={e => { if (!videoUploading) e.currentTarget.style.borderColor = BRAND; }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = BRAND}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
                 >
-                  {videoUploading ? <Spin size="small" /> : (
-                    <>
-                      <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
-                      <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Update</Text>
-                    </>
-                  )}
+                  <PlusOutlined style={{ fontSize: 18, color: isDark ? '#888' : '#bbb' }} />
+                  <Text type="secondary" style={{ fontSize: 10, marginTop: 2 }}>Update</Text>
                 </div>
               </div>
             ) : (
               <div
-                onClick={() => !videoUploading && videoInputRef.current?.click()}
+                onClick={() => videoInputRef.current?.click()}
                 style={{
                   width: '100%', padding: '20px 0',
                   borderRadius: 8,
                   border: `2px dashed ${isDark ? '#555' : '#d9d9d9'}`,
                   display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center',
-                  cursor: videoUploading ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                   background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
                 }}
-                onMouseEnter={e => { if (!videoUploading) e.currentTarget.style.borderColor = BRAND; }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = BRAND}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? '#555' : '#d9d9d9'; }}
               >
-                {videoUploading ? <Spin size="small" /> : (
-                  <>
-                    <VideoCameraOutlined style={{ fontSize: 24, color: isDark ? '#888' : '#bbb' }} />
-                    <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>Add a video</Text>
-                  </>
-                )}
+                <VideoCameraOutlined style={{ fontSize: 24, color: isDark ? '#888' : '#bbb' }} />
+                <Text type="secondary" style={{ fontSize: 12, marginTop: 4 }}>Add a video</Text>
               </div>
             )}
             <input
@@ -880,9 +885,9 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                 </Text>
               </div>
 
-              {existingFiles.length > 0 && (
+              {displayFiles.length > 0 && (
                 <div style={{ marginBottom: 12 }}>
-                  {existingFiles.map(f => (
+                  {displayFiles.map(f => (
                     <div
                       key={f.listing_file_id}
                       style={{
@@ -900,11 +905,12 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                             {f.filesize || (f.size_bytes ? `${(f.size_bytes / 1024 / 1024).toFixed(1)} MB` : '')}
                             {f.filetype ? ` · ${f.filetype.toUpperCase()}` : ''}
                           </Text>
+                          {f._isPending && <Tag color="blue" style={{ fontSize: 10, marginTop: 2 }}>Pending</Tag>}
                         </div>
                       </div>
                       <Popconfirm
                         title="Delete this file?"
-                        description={existingFiles.length === 1 ? 'Warning: Deleting the last file will convert this listing to a physical listing.' : undefined}
+                        description={displayFiles.length === 1 ? 'Warning: Deleting the last file will convert this listing to a physical listing.' : undefined}
                         onConfirm={() => handleDeleteFile(f.listing_file_id)}
                         okText="Delete"
                         cancelText="Cancel"
@@ -913,7 +919,7 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
                         <Button
                           type="text" size="small" danger
                           icon={<DeleteOutlined />}
-                          loading={deletingFileId === f.listing_file_id}
+                          loading={false}
                         />
                       </Popconfirm>
                     </div>
@@ -924,10 +930,9 @@ const EditListingModal = ({ open, onClose, onSuccess, listingId }) => {
               <Button
                 icon={<UploadOutlined />}
                 onClick={() => fileInputRef.current?.click()}
-                loading={fileUploading}
                 style={{ borderRadius: radii.sm }}
               >
-                {existingFiles.length > 0 ? 'Add Another File' : 'Upload Digital File'}
+                {displayFiles.length > 0 ? 'Add Another File' : 'Upload Digital File'}
               </Button>
               <input
                 ref={fileInputRef}
