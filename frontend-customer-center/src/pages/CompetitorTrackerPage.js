@@ -173,17 +173,18 @@ const CompetitorTrackerPage = () => {
   const [listingsModal, setListingsModal] = useState({ open: false, record: null });
   const [listingsData, setListingsData] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [allListingsModal, setAllListingsModal] = useState({ open: false, record: null });
-  const [allListingsData, setAllListingsData] = useState([]);
-  const [allListingsLoading, setAllListingsLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [loadMoreLoading, setLoadMoreLoading] = useState(false);
 
   const openListingsModal = async (record) => {
     setListingsModal({ open: true, record });
     setListingsData([]);
     setListingsLoading(true);
+    setShowAll(false);
     try {
-      const res = await etsyApi.getCompetitorDetail(record._id);
-      setListingsData(res.data?.topListings || []);
+      const res = await etsyApi.getSnapshots(record._id, { limit: 1 });
+      const latest = res.data?.snapshots?.[0];
+      setListingsData(latest?.topListings || []);
     } catch { setListingsData([]); }
     finally { setListingsLoading(false); }
   };
@@ -208,14 +209,15 @@ const CompetitorTrackerPage = () => {
       });
       return;
     }
-    const record = listingsModal.record;
-    setAllListingsModal({ open: true, record });
-    setAllListingsLoading(true);
+    // Pro Plus — fetch all listings and show in same modal
+    setLoadMoreLoading(true);
     try {
-      const res = await etsyApi.getCompetitorDetail(record._id);
-      setAllListingsData(res.data?.topListings || []);
+      const res = await etsyApi.getCompetitorDetail(listingsModal.record._id);
+      const all = res.data?.topListings || [];
+      if (all.length > listingsData.length) setListingsData(all);
+      setShowAll(true);
     } catch { message.error('Failed to load all listings'); }
-    finally { setAllListingsLoading(false); }
+    finally { setLoadMoreLoading(false); }
   };
 
   const renderTags = (tags) => {
@@ -652,26 +654,34 @@ const CompetitorTrackerPage = () => {
                 ) : (
                   <>
                     <Text strong style={{ display: 'block', marginBottom: 12, fontSize: 13 }}>
-                      Top Listings ({Math.min(listingsData.length, listingLimit)} of {listingsData.length} available)
+                      {showAll
+                        ? `All Listings (${listingsData.length})`
+                        : `Top Listings (${Math.min(listingsData.length, listingLimit)} of ${listingsData.length} captured)`}
                     </Text>
                     <Table
-                      dataSource={listingsData.slice(0, listingLimit).map((l, i) => ({ key: i, ...l }))}
+                      dataSource={
+                        showAll
+                          ? listingsData.map((l, i) => ({ key: i, ...l }))
+                          : listingsData.slice(0, listingLimit).map((l, i) => ({ key: i, ...l }))
+                      }
                       columns={listingColumns}
-                      pagination={false}
+                      pagination={showAll && listingsData.length > 20 ? { pageSize: 20, showSizeChanger: false } : false}
                       size="small"
+                      scroll={showAll ? { y: 500 } : undefined}
                     />
-                    {listingsData.length > listingLimit && (
+                    {!showAll && listingsData.length > listingLimit && (
                       <div style={{ textAlign: 'center', marginTop: 16 }}>
                         <Button
                           type="primary"
                           ghost
+                          loading={loadMoreLoading}
                           icon={hasDetailAccess ? <TrophyOutlined /> : <CrownOutlined />}
                           onClick={handleLoadMore}
                           style={{ borderColor: colors.brand, color: colors.brand, fontWeight: 600 }}
                         >
                           {hasDetailAccess
                             ? `View All ${listingsData.length} Listings`
-                            : `Unlock All ${listingsData.length} Listings — Upgrade to Pro Plus`}
+                            : `Unlock All Listings — Upgrade to Pro Plus`}
                         </Button>
                       </div>
                     )}
@@ -679,28 +689,6 @@ const CompetitorTrackerPage = () => {
                 )}
               </div>
             </>
-          )}
-        </Modal>
-
-        {/* ─── All Listings Modal (Pro Plus) ─── */}
-        <Modal
-          open={allListingsModal.open}
-          onCancel={() => setAllListingsModal({ open: false, record: null })}
-          footer={null}
-          width={950}
-          destroyOnClose
-          title={`All Listings — ${allListingsModal.record?.shopName || ''}`}
-        >
-          {allListingsLoading ? (
-            <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
-          ) : (
-            <Table
-              dataSource={allListingsData.map((l, i) => ({ key: i, ...l }))}
-              columns={listingColumns}
-              pagination={allListingsData.length > 25 ? { pageSize: 25, showSizeChanger: false } : false}
-              size="small"
-              scroll={{ y: 500 }}
-            />
           )}
         </Modal>
       </FeatureGate>
